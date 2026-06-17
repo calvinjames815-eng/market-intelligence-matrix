@@ -1,0 +1,38 @@
+name: Market Intelligence Daily Sweep
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout Repository Data
+      uses: actions/checkout@v4
+
+    - name: Instantiate Cloud Python Environment
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Install Data Matrix Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Execute Main Telemetry Loop
+      run: python main.py
+
+    - name: Commit and Secure Daily Data Output
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add market_engine_cache/
+        git diff-index --quiet HEAD || git commit -m "Automated Sweep Engine Run: $(date +'%Y-%m-%d')"
+        git push
