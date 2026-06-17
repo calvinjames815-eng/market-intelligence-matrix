@@ -1,6 +1,4 @@
 yfinance
-overpass
-pytrends
 pandas
 numpy
 requests
