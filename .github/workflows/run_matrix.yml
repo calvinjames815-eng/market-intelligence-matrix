@@ -1,15 +1,28 @@
-name: Execute Daily Market Matrix
-
+name: Market Intelligence Engine
 on:
   schedule:
-    - cron: '0 22 * * 1-5' # Runs automatically at 10 PM UTC every weekday (Mon-Fri)
-  workflow_dispatch: # Allows you to trigger the run manually with a single click on GitHub
+    # Schedule targeting US Markets (NYSE) from Philippines (UTC+8)
+    # Market Open: 9:30 AM EST = 9:30 PM PHT (UTC+8) -> cron: '30 21 * * 1-5'
+    - cron: '30 21 * * 1-5' 
+    # Mid-Day: 1:00 PM EST = 1:00 AM PHT (Next Day)
+    - cron: '0 1 * * 2-6'
+    # Market Close: 4:00 PM EST = 4:00 AM PHT (Next Day)
+    - cron: '0 4 * * 2-6'
+  workflow_dispatch:
 
 jobs:
-  build-and-run:
+  run-engine:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # Grants authorization to push updates back to the repo
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run Engine
+        run: python main.py
 
     steps:
     - name: Checkout Repository Code
