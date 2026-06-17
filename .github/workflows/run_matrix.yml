@@ -9,7 +9,7 @@ jobs:
   build-and-run:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Explicitly grants the token authorization to push updates back into main branch
+      contents: write # Grants the token authorization to push updates back to the repo
 
     steps:
     - name: Checkout Repository Code
