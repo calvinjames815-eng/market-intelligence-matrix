@@ -1,6 +1,5 @@
-yfinance
-overpass
-pytrends
-pandas
-numpy
-requests
+yfinance==0.2.40
+pytrends==4.9.2
+pandas==2.2.2
+numpy==1.26.4
+requests==2.32.3
