@@ -9,14 +9,14 @@ jobs:
   build-and-run:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Grants the token authorization to push updates back to the repo
+      contents: write # Grants authorization to push updates back to the repo
 
     steps:
     - name: Checkout Repository Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4 # Bumped from v3 to v4 for Node.js 24 support
 
     - name: Set up Python Environment
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5 # Bumped from v4 to v5 for Node.js 24 support
       with:
         python-version: '3.10'
 
