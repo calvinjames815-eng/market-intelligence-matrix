@@ -32,11 +32,17 @@ jobs:
       run: |
         git config --global user.name 'GitHub Automation Engine'
         git config --global user.email 'actions@github.com'
-        git add market_engine_cache/
-        # Check if changes exist before trying to commit
-        git diff-index --quiet HEAD || git commit -m "Automated Telemetry Update: $(date +'%Y-%m-%d')"
         
-        # Fix: Pull down your new workflow updates and stack the CSV on top
+        # 1. Pull any remote updates down first while local working directory is clean
         git pull --rebase origin main
         
-        git push origin main
+        # 2. Add the newly generated CSV file
+        git add market_engine_cache/
+        
+        # 3. Commit and push only if a new CSV change actually exists
+        if ! git diff-index --quiet HEAD; then
+          git commit -m "Automated Telemetry Update: $(date +'%Y-%m-%d')"
+          git push origin main
+        else
+          echo "No structural matrix changes detected. Skipping push."
+        fi
