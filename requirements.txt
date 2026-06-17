@@ -1,4 +1,4 @@
-yfinance
-pandas
-numpy
-requests
+yfinance==0.2.40
+pandas==2.2.2
+numpy==1.26.4
+requests==2.31.0
