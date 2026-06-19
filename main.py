@@ -1,4 +1,5 @@
 import sys
+import os
 import datetime
 import logging
 import time
@@ -9,7 +10,10 @@ import yfinance as yf
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-# 1. DEFINE TARGETS
+# Ensure cache directory exists for GitHub Artifacts
+CACHE_DIR = "market_engine_cache"
+os.makedirs(CACHE_DIR, exist_ok=True)
+
 TARGET_COMPANIES = {
     "NVDA": "NVIDIA", "AAPL": "Apple", "MSFT": "Microsoft", "GOOGL": "Alphabet",
     "AMZN": "Amazon", "TSM": "TSMC", "AVGO": "Broadcom", "2222.SR": "Saudi Aramco",
@@ -18,55 +22,41 @@ TARGET_COMPANIES = {
     "WMT": "Walmart", "AMD": "AMD", "JPM": "JPMorgan", "ASML": "ASML", "TCEHY": "Tencent"
 }
 
-def get_market_data(tickers):
-    """Fetches market data using native yfinance with retry logic."""
-    for attempt in range(3):
-        try:
-            logging.info(f"Attempt {attempt+1}: Fetching data...")
-            # Native download call - yfinance handles headers internally now
-            data = yf.download(
-                tickers, 
-                period="1y", 
-                progress=False, 
-                auto_adjust=True
-            )
-            
-            if not data.empty:
-                # Handle MultiIndex structure: Extract 'Close' prices
-                if isinstance(data.columns, pd.MultiIndex):
-                    return data['Close']
-                return data['Close']
-        
-        except Exception as e:
-            logging.warning(f"Attempt {attempt+1} failed: {e}")
-        
-        time.sleep(30) # Mandatory cool-down before retry
-    return pd.DataFrame()
-
 def run_integrated_engine():
     try:
         tickers = sorted(list(TARGET_COMPANIES.keys()))
-        df = get_market_data(tickers)
+        logging.info(f"Initiating Engine at {datetime.datetime.now()}")
         
-        if df.empty:
-            raise ValueError("No data returned from Yahoo Finance.")
-
-        # Stochastic Simulation (Phase 2)
+        # 1. Fetching Data
+        df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)['Close']
+        
+        # 2. Risk Calculation (Monte Carlo VaR95)
         returns = df.pct_change(fill_method=None).dropna()
         cov_matrix = returns.cov().fillna(0) + np.eye(len(tickers)) * 1e-6
         sims = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
         var_95 = np.percentile(sims.sum(axis=2).mean(axis=1), 5)
 
-        # Insight Logic (Phase 1)
+        # 3. Insight Logic
         insight_data = []
         for ticker in tickers:
             series = df[ticker].dropna()
             mom = ((series.iloc[-1] - series.iloc[-90]) / series.iloc[-90]) * 100 if len(series) >= 90 else 0.0
-            status = "REVIEW REQUIRED" if (mom/100) < var_95 else "STABLE"
-            insight_data.append({"Enterprise": TARGET_COMPANIES[ticker], "90D Momentum": f"{mom:+.2f}%", "Status": status})
+            status = "⚠️ REVIEW" if (mom/100) < var_95 else "✅ STABLE"
+            insight_data.append({
+                "Ticker": ticker, 
+                "Enterprise": TARGET_COMPANIES[ticker], 
+                "90D Momentum": f"{mom:+.2f}%", 
+                "Status": status
+            })
 
-        print(f"\n--- MARKET INTELLIGENCE REPORT | {datetime.date.today()} ---")
-        print(pd.DataFrame(insight_data).to_string(index=False))
+        # 4. Generate Output Artifacts
+        report_df = pd.DataFrame(insight_data)
+        file_path = os.path.join(CACHE_DIR, f"market_report_{datetime.date.today()}.csv")
+        report_df.to_csv(file_path, index=False)
+        
+        print(f"\n--- SYSTEMIC RISK THRESHOLD: {var_95:.4f} ---")
+        print(report_df.to_string(index=False))
+        logging.info(f"Artifact saved: {file_path}")
 
     except Exception as e:
         logging.error(f"ENGINE CRITICAL: {e}")
