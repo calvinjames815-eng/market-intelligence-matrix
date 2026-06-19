@@ -1,59 +1,47 @@
-import wbdata
+import requests
 import pandas as pd
 import numpy as np
-import os
 
 # Configuration
 MASTER_FILE = "macro_scorecard.csv"
 COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "TWN", "SAU", "ARE", "SGP", "DEU"]
 
-# World Bank Indicator IDs
-INDICATORS = {
-    "gdp_growth": "NY.GDP.MKTP.KD.ZG",
-    "inflation": "FP.CPI.TOTL.ZG"
-}
+def fetch_indicator(country_code, indicator_id):
+    """Direct API call to World Bank to avoid library-specific errors."""
+    url = f"https://api.worldbank.org/v2/country/{country_code}/indicator/{indicator_id}?format=json&per_page=1"
+    response = requests.get(url).json()
+    
+    # World Bank API returns a list where [0] is metadata, [1] is the data
+    if len(response) > 1 and response[1]:
+        value = response[1][0]['value']
+        return float(value) if value is not None else 0.0
+    return 0.0
 
 def get_real_macro_data():
-    """Fetches data one by one to ensure pipeline stability."""
-    target_codes = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "TWN", "SAU", "ARE", "SGP", "DEU"]
-    all_data = []
-
-    for code in target_codes:
-        try:
-            # Fetch one country at a time
-            df = wbdata.get_dataframe(INDICATORS, country=code)
-            # Take only the most recent year
-            latest = df.tail(1)
-            latest['country'] = code
-            all_data.append(latest)
-        except Exception as e:
-            print(f"Skipping {code} due to API error: {e}")
+    """Builds the dataframe by calling the API directly for each country."""
+    data_list = []
     
-    # Concatenate all successfully fetched data
-    full_df = pd.concat(all_data)
+    for code in COUNTRIES:
+        gdp = fetch_indicator(code, "NY.GDP.MKTP.KD.ZG")
+        inf = fetch_indicator(code, "FP.CPI.TOTL.ZG")
+        
+        data_list.append({
+            "country": code,
+            "gdp_growth": gdp / 100,
+            "inflation": inf / 100,
+            "infrastructure": 0.5 # Placeholder for OSM logic
+        })
     
-    # Data Cleaning
-    full_df['gdp_growth'] = full_df['gdp_growth'].fillna(0) / 100
-    full_df['inflation'] = full_df['inflation'].fillna(0) / 100
-    full_df['infrastructure'] = 0.5 
-    
-    return full_df
+    return pd.DataFrame(data_list).set_index('country')
 
 def calculate_attractiveness(row, weights=(0.5, 0.3, 0.2)):
-    w_gdp, w_infl, w_infra = weights
-    return (w_gdp * row['gdp_growth']) - (w_infl * row['inflation']) + (w_infra * row['infrastructure'])
+    return (weights[0] * row['gdp_growth']) - (weights[1] * row['inflation']) + (weights[2] * row['infrastructure'])
 
 if __name__ == "__main__":
-    # 1. Fetch
     data = get_real_macro_data()
-    
-    # 2. Score
     data['SCORE'] = data.apply(calculate_attractiveness, axis=1)
-    
-    # 3. Sort and Display
     results = data.sort_values(by='SCORE', ascending=False)
+    
     print(f"{'='*40}\nCOUNTRY ATTRACTIVENESS RANKING\n{'='*40}")
     print(results[['SCORE']])
-    
-    # 4. Save
     results.to_csv(MASTER_FILE)
