@@ -73,4 +73,21 @@ def run_engine():
     print(f"Successfully wrote to {MASTER_FILE}")
 
 if __name__ == "__main__":
-    run_engine()
+   print(f"\n{'='*60}")
+    print(f"REGIONAL MACRO-ENVIRONMENT")
+    print(f"{'='*60}")
+    print(f"{'COUNTRY':<8} {'GDP %':<8} {'INFL %':<8}")
+    # Assuming you have logic for inflation; if not, you can hardcode or placeholder it
+    for m in macro_summary:
+        print(f"{m['COUNTRY']:<8} {m['GDP']:<8.2f} {'N/A':<8}")
+    
+    print(f"\n{'='*60}")
+    print(f"ENTERPRISE PERFORMANCE MATRIX")
+    print(f"Systemic Risk Threshold (VaR 95%): {var_95:.4f}")
+    print(f"{'='*60}")
+    print(f"{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}")
+    
+    # Sort and print without emojis
+    for row in sorted(ent_data, key=lambda x: x['STATUS'], reverse=True):
+        status_text = "REVIEW" if row['STATUS'] == "REVIEW" else "STABLE"
+        print(f"{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {status_text:<10} {row['P/E']:<6} {row['MARGIN']}")
