@@ -21,8 +21,13 @@ def fetch_indicator(country_code, indicator_id):
         return 0.0
 
 def get_infrastructure_score(country_code):
-    """Queries OpenStreetMap with rate limiting and robust error handling."""
+    """Queries OpenStreetMap with User-Agent identification to avoid 406 errors."""
     overpass_url = "https://overpass-api.de/api/interpreter"
+    
+    # Identify the request to satisfy API security policies
+    headers = {
+        'User-Agent': 'MarketSimulator/1.0 (Contact: data_user@example.com)'
+    }
     
     query = f"""
     [out:json][timeout:25];
@@ -34,11 +39,11 @@ def get_infrastructure_score(country_code):
     out count;
     """
     
-    # Rate limit: Wait 2 seconds to avoid being blacklisted by Overpass
+    # Rate limit: Wait 2 seconds between each country call
     time.sleep(2) 
     
     try:
-        response = requests.post(overpass_url, data=query, timeout=30)
+        response = requests.post(overpass_url, data=query, headers=headers, timeout=30)
         if response.status_code != 200:
             print(f"DEBUG: OSM API returned {response.status_code} for {country_code}")
             return 0.1
@@ -71,9 +76,9 @@ def get_real_macro_data():
     return pd.DataFrame(data_list).set_index('country')
 
 def get_data_with_cache():
-    # Check if cache exists and is < 24 hours old (86400 seconds)
     if os.path.exists(CACHE_FILE):
         file_time = os.path.getmtime(CACHE_FILE)
+        # Check if cache is < 24 hours old
         if (time.time() - file_time) < 86400:
             print(f"--- LOADING FROM CACHE: {CACHE_FILE} ---")
             return pd.read_csv(CACHE_FILE, index_col='country')
