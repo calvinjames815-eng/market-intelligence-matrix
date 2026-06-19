@@ -26,3 +26,9 @@ jobs:
 
       - name: Execute Live Core Matrix Pipeline
         run: python main.py
+
+      - name: Archive Production Data
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-report-data
+          path: market_engine_cache/
