@@ -32,19 +32,17 @@ jobs:
           # cd scripts/ 
           python main.py
 
-     - name: Commit and Save Telemetry
+    - name: Commit and Save Telemetry
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # Debug: List the files so we can see what the runner actually sees
-          ls -R market_engine_cache/
-          
-          # Only add if the file exists
+          # Only proceed if the file was actually generated
           if [ -f "market_engine_cache/telemetry.csv" ]; then
             git add market_engine_cache/telemetry.csv
-            git commit -m "Automated Telemetry Update: $(date)" || echo "No changes to commit"
+            git commit -m "Automated Telemetry Update: $(date)"
             git push
           else
-            echo "File not found! Skipping commit."
+            echo "Telemetry file not found. Skipping commit."
+            exit 0
           fi
