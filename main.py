@@ -6,7 +6,7 @@ import numpy as np
 import yfinance as yf
 import requests
 
-# CONFIGURATION - Use Absolute Path
+# Set absolute path for CI/CD consistency
 PROJECT_ROOT = os.getcwd()
 CACHE_DIR = os.path.join(PROJECT_ROOT, "market_engine_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -31,7 +31,7 @@ TARGET_COMPANIES = {
 }
 
 def get_market_health(country_iso):
-    """Fetches macro data using requests."""
+    """Fetches macro data directly from World Bank API using requests."""
     try:
         url = f"https://api.worldbank.org/v2/country/{country_iso}/indicator/NY.GDP.MKTP.KD.ZG?format=json&date=2020:2025"
         response = requests.get(url, timeout=10)
@@ -42,7 +42,7 @@ def get_market_health(country_iso):
         rating = "LOW" if avg_growth > 2.0 else "MODERATE"
         viability = "STABLE" if avg_growth > 2.0 else "WATCH"
         return avg_growth, rating, viability
-    except:
+    except Exception:
         return 0.0, "N/A", "N/A"
 
 def run_engine():
@@ -54,13 +54,9 @@ def run_engine():
     sims = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
     var_95 = np.percentile(sims.sum(axis=2).mean(axis=1), 5)
 
-    ent_data, macro_summary = [], []
+    ent_data = []
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    for iso, wb_code in COUNTRY_ISO_MAP.items():
-        gdp, risk, viab = get_market_health(wb_code)
-        macro_summary.append({"COUNTRY": iso, "GDP": gdp, "RISK": risk, "VIABILITY": viab})
-
     for t in tickers:
         name, code, pe, margin = TARGET_COMPANIES[t]
         series = df[t].dropna()
@@ -72,13 +68,9 @@ def run_engine():
             "MARGIN": f"{margin*100:.0f}%"
         })
 
-    # Save using absolute path
+    # Save to the specific path defined by the YAML
     pd.DataFrame(ent_data).to_csv(MASTER_FILE, mode='a', index=False, header=not os.path.exists(MASTER_FILE))
-    print(f"DEBUG: Successfully wrote file to {MASTER_FILE}")
+    print(f"Successfully wrote to {MASTER_FILE}")
 
 if __name__ == "__main__":
-    try:
-        run_engine()
-    except Exception as e:
-        print(f"Pipeline failed: {e}")
-        sys.exit(1)
+    run_engine()
