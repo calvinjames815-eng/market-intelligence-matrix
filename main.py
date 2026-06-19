@@ -21,27 +21,37 @@ def fetch_indicator(country_code, indicator_id):
         return 0.0
 
 def get_infrastructure_score(country_code):
-    """Queries OpenStreetMap (Overpass API) for economic infrastructure nodes."""
+    """Queries OpenStreetMap with rate limiting and robust error handling."""
     overpass_url = "https://overpass-api.de/api/interpreter"
+    
     query = f"""
     [out:json][timeout:25];
-    area["ISO3166-1"="{country_code}"][admin_level=2]->.searchArea;
+    area["ISO3166-1"="{country_code}"]["admin_level"="2"]->.searchArea;
     (
       node["amenity"="bank"](area.searchArea);
       way["aeroway"="aerodrome"](area.searchArea);
     );
     out count;
     """
+    
+    # Rate limit: Wait 2 seconds to avoid being blacklisted by Overpass
+    time.sleep(2) 
+    
     try:
-        response = requests.post(overpass_url, data=query, timeout=25).json()
-        # Corrected Parsing: 'out count' returns a list with the total count in the 'tags' field of the first element
-        elements = response.get('elements', [])
+        response = requests.post(overpass_url, data=query, timeout=30)
+        if response.status_code != 200:
+            print(f"DEBUG: OSM API returned {response.status_code} for {country_code}")
+            return 0.1
+            
+        data = response.json()
+        elements = data.get('elements', [])
+        # 'out count' returns an element where the total is in the 'tags' field
         count = int(elements[0].get('tags', {}).get('total', 0)) if elements else 0
         
-        print(f"DEBUG: OSM {country_code} count={count}")
+        print(f"DEBUG: OSM {country_code} success, count={count}")
         return min(float(count) / 500, 1.0) 
     except Exception as e:
-        print(f"DEBUG: OSM Error for {country_code}: {e}")
+        print(f"DEBUG: OSM Connection issue for {country_code}: {e}")
         return 0.1
 
 def get_real_macro_data():
@@ -61,7 +71,7 @@ def get_real_macro_data():
     return pd.DataFrame(data_list).set_index('country')
 
 def get_data_with_cache():
-    # 1. Check if cache exists and is < 24 hours old
+    # Check if cache exists and is < 24 hours old (86400 seconds)
     if os.path.exists(CACHE_FILE):
         file_time = os.path.getmtime(CACHE_FILE)
         if (time.time() - file_time) < 86400:
@@ -70,12 +80,12 @@ def get_data_with_cache():
         else:
             print("--- CACHE EXPIRED. REFRESHING ---")
     
-    # 2. Fetch fresh
     data = get_real_macro_data()
     data.to_csv(CACHE_FILE)
     return data
 
 def get_risk_adjusted_score(row, simulations=1000):
+    """Monte Carlo engine for risk-adjusted performance."""
     gdp_std = abs(row['gdp_growth'] * 0.1)
     infl_std = abs(row['inflation'] * 0.1)
     sim_gdp = np.random.normal(row['gdp_growth'], gdp_std, simulations)
@@ -85,9 +95,14 @@ def get_risk_adjusted_score(row, simulations=1000):
 
 if __name__ == "__main__":
     data = get_data_with_cache()
+    
+    # Apply Monte Carlo Engine
     data['RISK_ADJ_SCORE'] = data.apply(get_risk_adjusted_score, axis=1)
+    
+    # Sort and Print Results
     results = data.sort_values(by='RISK_ADJ_SCORE', ascending=False)
     
     print(f"\n{'='*60}\nMONTE CARLO RISK-ADJUSTED RANKING\n{'='*60}")
     print(results[['gdp_growth', 'inflation', 'infrastructure', 'RISK_ADJ_SCORE']])
+    
     results.to_csv(MASTER_FILE)
