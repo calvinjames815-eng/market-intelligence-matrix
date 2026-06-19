@@ -1,51 +1,20 @@
-name: Market Intelligence Engine
-
+name: Market Engine Pipeline
 on:
   schedule:
-    - cron: '30 21 * * 1-5'
-  workflow_dispatch:
+    - cron: '0 0 * * 1' # Runs weekly
+  push:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
       - name: Install dependencies
-        run: |
-          pip install yfinance numpy pandas requests
-
-      - name: Execute Live Core Matrix Pipeline
+        run: pip install -r requirements.txt
+      - name: Run Engine
         run: python main.py
-
-      - name: Display Historical Snapshot
-        # Use on_bad_lines='skip' to prevent the pipeline from crashing 
-        # if a single row in your history file is ever mangled.
-        run: |
-          python -c "
-          import pandas as pd
-          try:
-              df = pd.read_csv('market_engine_cache/telemetry.csv', on_bad_lines='skip')
-              print(f'\n{'='*60}\nLATEST HISTORICAL SNAPSHOT (LAST 20 ENTRIES)\n{'='*60}')
-              print(f'{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}')
-              for _, row in df.tail(20).iterrows():
-                  print(f'{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {row['STATUS']:<10} {row['P/E']:<6} {row['MARGIN']}')
-          except Exception as e:
-              print(f'Could not display history: {e}')
-          "
-
-      - name: Commit and Save Telemetry
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          
-          if [ -f "market_engine_cache/telemetry.csv" ]; then
-            git add -f market_engine_cache/telemetry.csv
-            git commit -m "Automated Telemetry Update: $(date)"
-            git push
-          else
-            echo "::error::Telemetry file not found."
-            exit 1
-          fi
