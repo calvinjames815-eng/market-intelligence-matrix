@@ -48,14 +48,20 @@ def run_engine():
         mom = ((series.iloc[-1] - series.iloc[-90]) / series.iloc[-90]) * 100
         
         status = "REVIEW" if (mom/100) < var_95 else "STABLE"
+        
+        # Append all telemetry data for CSV recording
         ent_data.append({
             "TIMESTAMP": timestamp,
+            "COUNTRY": code,
             "ENTERPRISE": name, 
             "TICKER": t,
             "MOMENTUM": f"{mom:+.2f}%", 
             "STATUS": status, 
             "P/E": f"{pe:.1f}x", 
-            "MARGIN": f"{margin*100:.0f}%"
+            "MARGIN": f"{margin*100:.0f}%",
+            "HUB OSM": osm,
+            "GDP %": gdp,
+            "INFL %": infl
         })
         
         if not any(c['COUNTRY'] == code for c in cntry_data):
@@ -66,17 +72,12 @@ def run_engine():
     file_exists = os.path.isfile(MASTER_FILE)
     ent_df.to_csv(MASTER_FILE, mode='a', index=False, header=not file_exists)
 
-    if os.path.exists(MASTER_FILE):
-        print(f"DEBUG: File successfully created at {MASTER_FILE}")
-        print(f"DEBUG: File size: {os.path.getsize(MASTER_FILE)} bytes")
-    else:
-        print("DEBUG: CRITICAL ERROR - File not found!")
-
-    # Print Report
+    # Print Report (No Emojis)
     print(f"{'='*60}\nREGIONAL MACRO-ENVIRONMENT\n{'='*60}")
     print(pd.DataFrame(cntry_data).to_string(index=False))
     print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\nSystemic Risk Threshold (VaR 95%): {var_95:.4f}\n{'='*60}")
-    print(ent_df.drop(columns=['TIMESTAMP']).to_string(index=False))
+    # Display subset of columns for clean terminal view
+    print(ent_df[['ENTERPRISE', 'MOMENTUM', 'STATUS', 'P/E', 'MARGIN']].to_string(index=False))
 
 if __name__ == "__main__":
     run_engine()
