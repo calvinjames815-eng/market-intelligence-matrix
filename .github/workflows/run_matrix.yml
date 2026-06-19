@@ -17,21 +17,23 @@ jobs:
         run: |
           pip install yfinance numpy pandas requests
 
-      - name: Cleanup Corrupted Cache
-        run: rm -f market_engine_cache/telemetry.csv
-
       - name: Execute Live Core Matrix Pipeline
         run: python main.py
 
       - name: Display Historical Snapshot
+        # Use on_bad_lines='skip' to prevent the pipeline from crashing 
+        # if a single row in your history file is ever mangled.
         run: |
           python -c "
           import pandas as pd
-          df = pd.read_csv('market_engine_cache/telemetry.csv')
-          print(f'\n{'='*60}\nLATEST HISTORICAL SNAPSHOT (LAST 20 ENTRIES)\n{'='*60}')
-          print(f'{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}')
-          for _, row in df.tail(20).iterrows():
-              print(f'{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {row['STATUS']:<10} {row['P/E']:<6} {row['MARGIN']}')
+          try:
+              df = pd.read_csv('market_engine_cache/telemetry.csv', on_bad_lines='skip')
+              print(f'\n{'='*60}\nLATEST HISTORICAL SNAPSHOT (LAST 20 ENTRIES)\n{'='*60}')
+              print(f'{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}')
+              for _, row in df.tail(20).iterrows():
+                  print(f'{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {row['STATUS']:<10} {row['P/E']:<6} {row['MARGIN']}')
+          except Exception as e:
+              print(f'Could not display history: {e}')
           "
 
       - name: Commit and Save Telemetry
