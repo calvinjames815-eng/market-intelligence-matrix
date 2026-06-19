@@ -1,66 +1,48 @@
-import os
+import wbdata
 import pandas as pd
 import numpy as np
+import os
 
-# CONFIGURATION
-PROJECT_ROOT = os.getcwd()
-CACHE_DIR = os.path.join(PROJECT_ROOT, "market_engine_cache")
-os.makedirs(CACHE_DIR, exist_ok=True)
-MASTER_FILE = os.path.join(CACHE_DIR, "macro_scorecard.csv")
+# Configuration
+MASTER_FILE = "macro_scorecard.csv"
+COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "TWN", "SAU", "ARE", "SGP", "DEU"]
 
-# Defining the target universe
-COUNTRIES = [
-    "USA", "JPN", "CHN", "IND", "CHE", "KOR", 
-    "NLD", "TWN", "SAU", "ARE", "SGP", "DEU"
-]
+# World Bank Indicator IDs
+INDICATORS = {
+    "gdp_growth": "NY.GDP.MKTP.KD.ZG",
+    "inflation": "FP.CPI.TOTL.ZG"
+}
 
-def get_macro_data(country_code):
-    """
-    STUB: Replace this with calls to wbdata or requests for OSM.
-    Returns normalized values (0 to 1 scale) for the scoring function.
-    """
-    # Placeholder data for logic testing
-    return {
-        "gdp_growth": np.random.uniform(0.01, 0.06),
-        "inflation": np.random.uniform(0.01, 0.05),
-        "infrastructure": np.random.uniform(0.5, 0.9)
-    }
+def get_real_macro_data():
+    """Fetches real data from World Bank."""
+    # Fetch data
+    df = wbdata.get_dataframe(INDICATORS, country=COUNTRIES, convert_date=True)
+    # Get the most recent non-null year for each country
+    df = df.groupby('country').last()
+    
+    # Normalize/Clean data (Fill NaN with neutral values to prevent crashes)
+    df['gdp_growth'] = df['gdp_growth'].fillna(0) / 100 # Convert % to decimal
+    df['inflation'] = df['inflation'].fillna(0) / 100
+    
+    # Placeholder for infrastructure density (OSM API would go here)
+    df['infrastructure'] = 0.5 
+    return df
 
-def calculate_attractiveness(data, weights=(0.5, 0.3, 0.2)):
-    """
-    Scoring Function: (w1 * GDP) - (w2 * Inflation) + (w3 * Infrastructure)
-    """
+def calculate_attractiveness(row, weights=(0.5, 0.3, 0.2)):
     w_gdp, w_infl, w_infra = weights
-    score = (w_gdp * data["gdp_growth"]) - (w_infl * data["inflation"]) + (w_infra * data["infrastructure"])
-    return round(score, 4)
-
-def run_simulation(n_iterations=1000):
-    """
-    Runs a Monte Carlo simulation on the scores to determine Risk-Adjusted Attractiveness.
-    """
-    results = []
-    for country in COUNTRIES:
-        # Simulate volatility in macro-factors
-        scores = []
-        for _ in range(n_iterations):
-            data = get_macro_data(country)
-            scores.append(calculate_attractiveness(data))
-        
-        results.append({
-            "COUNTRY": country,
-            "MEAN_SCORE": np.mean(scores),
-            "STDEV": np.std(scores),
-            "RISK_ADJUSTED": np.mean(scores) - (2 * np.std(scores)) # Conservative estimate
-        })
-    return pd.DataFrame(results)
+    return (w_gdp * row['gdp_growth']) - (w_infl * row['inflation']) + (w_infra * row['infrastructure'])
 
 if __name__ == "__main__":
-    df_results = run_simulation()
-    df_results = df_results.sort_values(by="RISK_ADJUSTED", ascending=False)
+    # 1. Fetch
+    data = get_real_macro_data()
     
-    print(f"{'='*50}\nSTRATEGIC MARKET ENTRY SCORECARD\n{'='*50}")
-    print(df_results.to_string(index=False))
+    # 2. Score
+    data['SCORE'] = data.apply(calculate_attractiveness, axis=1)
     
-    # Secure storage: Only append if file doesn't exist to prevent overwrite hacks
-    if not os.path.exists(MASTER_FILE):
-        df_results.to_csv(MASTER_FILE, index=False)
+    # 3. Sort and Display
+    results = data.sort_values(by='SCORE', ascending=False)
+    print(f"{'='*40}\nCOUNTRY ATTRACTIVENESS RANKING\n{'='*40}")
+    print(results[['SCORE']])
+    
+    # 4. Save
+    results.to_csv(MASTER_FILE)
