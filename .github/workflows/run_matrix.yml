@@ -1,4 +1,5 @@
 name: Market Intelligence Engine
+
 on:
   schedule:
     - cron: '30 21 * * 1-5'
@@ -10,29 +11,28 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions: # Add this block to explicitly allow writing
+    permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      
-     - name: Install dependencies
-      run: |
-        pip install yfinance numpy pandas-datareader
-        # Force a version of pandas that is compatible with pandas-datareader 0.10.0
-        pip install "pandas<2.0.0"
-          
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance numpy pandas-datareader
+          pip install "pandas<2.0.0"
+
       - name: Execute Live Core Matrix Pipeline
         run: python main.py
-        
+
       - name: Commit and Save Telemetry
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-      - name: Debug and Commit
-      run: |
-        echo "Checking for telemetry file..."
-        ls -la market_engine_cache/ || echo "Directory not found"
-        # ... rest of your git commands ...
+          
+          # Debugging step: check where the file is
+          echo "Debugging: Contents of repository:"
+          ls -R
+          
           if [ -f "market_engine_cache/telemetry.csv" ]; then
             git add market_engine_cache/telemetry.csv
             git commit -m "Automated Telemetry Update: $(date)"
