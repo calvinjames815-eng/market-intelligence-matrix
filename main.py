@@ -1,67 +1,83 @@
-import sys
+import os
 import datetime
 import logging
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import sys
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format="%(message)s")
+os.makedirs("market_engine_cache", exist_ok=True)
 
-# Define companies at the top level so they are always visible
-TARGET_COMPANIES = {
-    "NVDA": "NVIDIA", "AAPL": "Apple", "MSFT": "Microsoft", "GOOGL": "Alphabet",
-    "AMZN": "Amazon", "TSM": "TSMC", "AVGO": "Broadcom", "2222.SR": "Saudi Aramco",
-    "TSLA": "Tesla", "META": "Meta Platforms", "005930.KS": "Samsung", "MU": "Micron",
-    "000660.KS": "SK Hynix", "BRK-B": "Berkshire", "LLY": "Eli Lilly",
-    "WMT": "Walmart", "AMD": "AMD", "JPM": "JPMorgan", "ASML": "ASML", "TCEHY": "Tencent"
+# --- CONFIGURATION ---
+COUNTRIES = {
+    "USA": "United States", "CHN": "China", "JPN": "Japan", "CHE": "Switzerland",
+    "IND": "India", "BRA": "Brazil", "VNM": "Vietnam", "SAU": "Saudi Arabia",
+    "ARE": "UAE", "KOR": "South Korea", "TWN": "Taiwan", "NLD": "Netherlands"
 }
 
-def run_business_insight_engine():
-    try:
-        # Use the global variable defined above
-        tickers = sorted(list(TARGET_COMPANIES.keys()))
-        
-        # 1. LIVE DATA FETCH
-        df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)['Close']
-        if df.empty:
-            raise ValueError("Connection Timeout: No data returned from market tape.")
+# Mapping: (Name, Country, P/E, EV/EBITDA, Margin)
+TARGET_COMPANIES = {
+    "NVDA": ("NVIDIA", "USA", 32.4, 28.1, 0.55), "AAPL": ("Apple", "USA", 28.1, 18.2, 0.26),
+    "MSFT": ("Microsoft", "USA", 31.5, 20.4, 0.35), "GOOGL": ("Alphabet", "USA", 24.2, 14.8, 0.27),
+    "AMZN": ("Amazon", "USA", 38.0, 13.1, 0.10), "TSM": ("TSMC", "TWN", 22.1, 11.5, 0.38),
+    "AVGO": ("Broadcom", "USA", 26.4, 17.2, 0.22), "2222.SR": ("Saudi Aramco", "SAU", 16.5, 9.8, 0.42),
+    "TSLA": ("Tesla", "USA", 45.2, 24.1, 0.12), "META": ("Meta Platforms", "USA", 23.9, 13.5, 0.32),
+    "005930.KS": ("Samsung", "KOR", 14.1, 7.2, 0.08), "MU": ("Micron", "USA", 20.2, 11.4, 0.14),
+    "000660.KS": ("SK Hynix", "KOR", 15.4, 8.1, 0.11), "BRK-B": ("Berkshire", "USA", 19.8, 12.0, 0.15),
+    "LLY": ("Eli Lilly", "USA", 55.4, 34.2, 0.21), "WMT": ("Walmart", "USA", 25.1, 12.8, 0.03),
+    "AMD": ("AMD", "USA", 34.1, 22.0, 0.11), "JPM": ("JPMorgan", "USA", 12.2, 10.1, 0.33),
+    "ASML": ("ASML", "NLD", 36.5, 24.2, 0.28), "TCEHY": ("Tencent", "CHN", 18.2, 11.1, 0.29)
+}
 
-        # 2. STOCHASTIC SIMULATION
-        # Ensure we drop NaNs specifically for the return calculation
+def run_integrated_engine():
+    try:
+        tickers = sorted(list(TARGET_COMPANIES.keys()))
+        logging.info("⚡ Synchronizing with Global Market Tape...")
+        
+        # 1. FETCH DATA (Single source of truth)
+        df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)['Close']
+        if df.empty: raise ValueError("Data fetch failed.")
+
+        # 2. STOCHASTIC RISK MODEL (Phase 2)
         returns = df.pct_change(fill_method=None).dropna()
         cov_matrix = returns.cov().fillna(0) + np.eye(len(tickers)) * 1e-6
-        
-        # 10,000 iterations to determine the 95% Risk Floor
-        simulations = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
-        var_95 = np.percentile(simulations.sum(axis=2).mean(axis=1), 5)
-        
-        # 3. BUSINESS INSIGHT LOGIC
-        insight_data = []
+        sims = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
+        var_95 = np.percentile(sims.sum(axis=2).mean(axis=1), 5)
+
+        # 3. GENERATE MATRIX (Phase 1)
+        records = []
         for ticker in tickers:
-            name = TARGET_COMPANIES[ticker]
-            series = df[ticker].dropna()
+            name, country, pe, ev, margin = TARGET_COMPANIES[ticker]
+            closes = df[ticker].dropna()
             
-            mom = ((series.iloc[-1] - series.iloc[-90]) / series.iloc[-90]) * 100 if len(series) >= 90 else 0.0
-            status = "REVIEW REQUIRED" if mom < (var_95 * 100) else "STABLE"
+            # Momentum
+            mom = ((closes.iloc[-1] - closes.iloc[-90]) / closes.iloc[-90]) * 100 if len(closes) >= 90 else 0.0
             
-            insight_data.append({
+            # Risk Status (Combined Logic)
+            status = "URGENT REVIEW" if (mom/100) < var_95 else "STABLE"
+            
+            records.append({
                 "Enterprise": name,
                 "90D Momentum": f"{mom:+.2f}%",
-                "Status": status
+                "Stability": status,
+                "P/E": pe,
+                "Margin %": margin * 100
             })
 
         # 4. OUTPUT
-        df_final = pd.DataFrame(insight_data)
-        print(f"\n--- MARKET INTELLIGENCE REPORT | {datetime.date.today()} ---")
+        df_final = pd.DataFrame(records)
+        print(f"\n--- INTEGRATED BUSINESS INSIGHT ENGINE | {datetime.date.today()} ---")
         print(f"Systemic Risk Threshold (VaR 95%): {var_95:.4f}")
-        print("-" * 60)
         print(df_final.to_string(index=False))
-        print("-" * 60)
+        
+        # Export to CSV for your records
+        df_final.to_csv(f"market_engine_cache/final_matrix_{datetime.date.today()}.csv")
 
     except Exception as e:
-        logging.error(f"ENGINE CRITICAL ERROR: {e}")
+        logging.error(f"ENGINE CRITICAL: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    run_business_insight_engine()
+    run_integrated_engine()
