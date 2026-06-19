@@ -10,8 +10,8 @@ on:
 jobs:
   run-engine:
     runs-on: ubuntu-latest
-    permissions: # Required to allow the bot to push to your repo
-      contents: write
+    permissions:
+      contents: write # IMPORTANT: Allows the bot to save files
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -29,11 +29,11 @@ jobs:
       - name: Execute Live Core Matrix Pipeline
         run: python main.py
 
-      - name: Commit and Push Cache
+      - name: Commit and Save Telemetry
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git add market_engine_cache/
-          # Only commit if there are changes to avoid empty commits
-          git commit -m "Update cache: $(date)" || echo "No changes to commit"
+          # Only commit if there are new/changed files
+          git commit -m "Automated Telemetry Update: $(date)" || echo "No changes to commit"
           git push
