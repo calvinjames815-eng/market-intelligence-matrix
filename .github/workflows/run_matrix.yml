@@ -17,6 +17,9 @@ jobs:
         run: |
           pip install yfinance numpy pandas requests
 
+      - name: Cleanup Corrupted Cache
+        run: rm -f market_engine_cache/telemetry.csv
+
       - name: Execute Live Core Matrix Pipeline
         run: python main.py
 
