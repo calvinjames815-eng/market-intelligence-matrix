@@ -33,7 +33,8 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add market_engine_cache/
-          # Only commit if there are new/changed files
-          git commit -m "Automated Telemetry Update: $(date)" || echo "No changes to commit"
+          # Force add the file even if git thinks it's clean
+          git add -f market_engine_cache/telemetry.csv
+          # Use a unique timestamp to force a commit
+          git commit -m "Automated Telemetry Update: $(date)" || echo "No changes detected"
           git push
