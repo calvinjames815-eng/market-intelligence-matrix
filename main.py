@@ -6,7 +6,7 @@ import numpy as np
 import yfinance as yf
 import requests
 
-# Set absolute path for CI/CD consistency
+# CONFIGURATION
 PROJECT_ROOT = os.getcwd()
 CACHE_DIR = os.path.join(PROJECT_ROOT, "market_engine_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
@@ -31,19 +31,14 @@ TARGET_COMPANIES = {
 }
 
 def get_market_health(country_iso):
-    """Fetches macro data directly from World Bank API using requests."""
     try:
         url = f"https://api.worldbank.org/v2/country/{country_iso}/indicator/NY.GDP.MKTP.KD.ZG?format=json&date=2020:2025"
-        response = requests.get(url, timeout=10)
-        data = response.json()[1]
-        values = [item['value'] for item in data if item['value'] is not None]
+        data = requests.get(url, timeout=10).json()[1]
+        values = [i['value'] for i in data if i['value'] is not None]
         avg_growth = sum(values) / len(values) if values else 0
-        
-        rating = "LOW" if avg_growth > 2.0 else "MODERATE"
-        viability = "STABLE" if avg_growth > 2.0 else "WATCH"
-        return avg_growth, rating, viability
-    except Exception:
-        return 0.0, "N/A", "N/A"
+        return avg_growth
+    except:
+        return 0.0
 
 def run_engine():
     tickers = sorted(list(TARGET_COMPANIES.keys()))
@@ -54,40 +49,37 @@ def run_engine():
     sims = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
     var_95 = np.percentile(sims.sum(axis=2).mean(axis=1), 5)
 
-    ent_data = []
+    ent_data, macro_summary = [], []
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
+    for iso, wb_code in COUNTRY_ISO_MAP.items():
+        macro_summary.append({"COUNTRY": iso, "GDP": get_market_health(wb_code)})
+
     for t in tickers:
         name, code, pe, margin = TARGET_COMPANIES[t]
         series = df[t].dropna()
         mom = ((series.iloc[-1] - series.iloc[-90]) / series.iloc[-90]) * 100
         status = "REVIEW" if (mom/100) < var_95 else "STABLE"
-        ent_data.append({
-            "TIMESTAMP": timestamp, "COUNTRY": code, "ENTERPRISE": name,
-            "MOMENTUM": f"{mom:+.2f}%", "STATUS": status, "P/E": f"{pe:.1f}x", 
-            "MARGIN": f"{margin*100:.0f}%"
-        })
+        ent_data.append({"TIMESTAMP": timestamp, "COUNTRY": code, "ENTERPRISE": name,
+                         "MOMENTUM": f"{mom:+.2f}%", "STATUS": status, "P/E": f"{pe:.1f}x", 
+                         "MARGIN": f"{margin*100:.0f}%"})
 
-    # Save to the specific path defined by the YAML
     pd.DataFrame(ent_data).to_csv(MASTER_FILE, mode='a', index=False, header=not os.path.exists(MASTER_FILE))
-    print(f"Successfully wrote to {MASTER_FILE}")
+    return ent_data, macro_summary, var_95
 
 if __name__ == "__main__":
-   print(f"\n{'='*60}")
-    print(f"REGIONAL MACRO-ENVIRONMENT")
-    print(f"{'='*60}")
-    print(f"{'COUNTRY':<8} {'GDP %':<8} {'INFL %':<8}")
-    # Assuming you have logic for inflation; if not, you can hardcode or placeholder it
-    for m in macro_summary:
-        print(f"{m['COUNTRY']:<8} {m['GDP']:<8.2f} {'N/A':<8}")
-    
-    print(f"\n{'='*60}")
-    print(f"ENTERPRISE PERFORMANCE MATRIX")
-    print(f"Systemic Risk Threshold (VaR 95%): {var_95:.4f}")
-    print(f"{'='*60}")
-    print(f"{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}")
-    
-    # Sort and print without emojis
-    for row in sorted(ent_data, key=lambda x: x['STATUS'], reverse=True):
-        status_text = "REVIEW" if row['STATUS'] == "REVIEW" else "STABLE"
-        print(f"{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {status_text:<10} {row['P/E']:<6} {row['MARGIN']}")
+    try:
+        ent_data, macro_summary, var_95 = run_engine()
+        
+        print(f"\n{'='*60}\nREGIONAL MACRO-ENVIRONMENT\n{'='*60}")
+        print(f"{'COUNTRY':<8} {'GDP %':<8} {'INFL %':<8}")
+        for m in macro_summary:
+            print(f"{m['COUNTRY']:<8} {m['GDP']:<8.2f} {'N/A':<8}")
+        
+        print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\nSystemic Risk Threshold (VaR 95%): {var_95:.4f}\n{'='*60}")
+        print(f"{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}")
+        for row in sorted(ent_data, key=lambda x: x['STATUS'], reverse=True):
+            print(f"{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {row['STATUS']:<10} {row['P/E']:<6} {row['MARGIN']}")
+    except Exception as e:
+        print(f"Pipeline failed: {e}")
+        sys.exit(1)
