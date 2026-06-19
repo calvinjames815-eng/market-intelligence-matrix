@@ -14,21 +14,25 @@ INDICATORS = {
 }
 
 def get_real_macro_data():
-    """Fetches real data from World Bank."""
-    # Removed 'convert_date=True' as it is not a valid argument for get_dataframe
-    df = wbdata.get_dataframe(INDICATORS, country=COUNTRIES)
+    """Fetches data using verified ISO codes for the World Bank API."""
+    # Use standard 3-letter ISO codes that the World Bank is guaranteed to recognize
+    target_countries = {
+        "USA": "USA", "JPN": "JPN", "CHN": "CHN", "IND": "IND", 
+        "CHE": "CHE", "KOR": "KOR", "NLD": "NLD", "TWN": "TWN", 
+        "SAU": "SAU", "ARE": "ARE", "SGP": "SGP", "DEU": "DEU"
+    }
     
-    # Get the most recent non-null year for each country
-    # The dataframe returned by wbdata is multi-indexed by (country, date)
-    # We group by the level 'country' and take the last available entry
+    # We pass the values (the codes) to the API
+    df = wbdata.get_dataframe(INDICATORS, country=list(target_countries.values()))
+    
+    # Group by country and take the most recent data
     df = df.groupby(level='country').last()
     
-    # Normalize/Clean data
-    df['gdp_growth'] = df['gdp_growth'].fillna(0) / 100 
+    # Data Cleaning: Ensure no NaNs exist to prevent calculation crashes
+    df['gdp_growth'] = df['gdp_growth'].fillna(0) / 100
     df['inflation'] = df['inflation'].fillna(0) / 100
+    df['infrastructure'] = 0.5  # Placeholder
     
-    # Placeholder for infrastructure density
-    df['infrastructure'] = 0.5 
     return df
 
 def calculate_attractiveness(row, weights=(0.5, 0.3, 0.2)):
