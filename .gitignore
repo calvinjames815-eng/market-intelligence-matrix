@@ -1,1 +1,8 @@
-market_engine_cache/*.csv
+# Cache and Data
+market_engine_cache/
+__pycache__/
+
+# Credentials/Environment
+.env
+.ipynb_checkpoints/
+*.csv
