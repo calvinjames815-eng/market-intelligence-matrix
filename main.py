@@ -2,6 +2,7 @@ import requests
 import pandas as pd
 import numpy as np
 import os
+import time
 
 MASTER_FILE = "macro_scorecard.csv"
 CACHE_FILE = "market_engine_cache.csv"
@@ -33,9 +34,14 @@ def get_infrastructure_score(country_code):
     """
     try:
         response = requests.post(overpass_url, data=query, timeout=25).json()
-        count = int(response.get('elements', [{}])[0].get('tags', {}).get('total', 0))
+        # Corrected Parsing: 'out count' returns a list with the total count in the 'tags' field of the first element
+        elements = response.get('elements', [])
+        count = int(elements[0].get('tags', {}).get('total', 0)) if elements else 0
+        
+        print(f"DEBUG: OSM {country_code} count={count}")
         return min(float(count) / 500, 1.0) 
-    except Exception:
+    except Exception as e:
+        print(f"DEBUG: OSM Error for {country_code}: {e}")
         return 0.1
 
 def get_real_macro_data():
@@ -55,15 +61,21 @@ def get_real_macro_data():
     return pd.DataFrame(data_list).set_index('country')
 
 def get_data_with_cache():
+    # 1. Check if cache exists and is < 24 hours old
     if os.path.exists(CACHE_FILE):
-        print(f"--- LOADING FROM CACHE: {CACHE_FILE} ---")
-        return pd.read_csv(CACHE_FILE, index_col='country')
+        file_time = os.path.getmtime(CACHE_FILE)
+        if (time.time() - file_time) < 86400:
+            print(f"--- LOADING FROM CACHE: {CACHE_FILE} ---")
+            return pd.read_csv(CACHE_FILE, index_col='country')
+        else:
+            print("--- CACHE EXPIRED. REFRESHING ---")
+    
+    # 2. Fetch fresh
     data = get_real_macro_data()
     data.to_csv(CACHE_FILE)
     return data
 
 def get_risk_adjusted_score(row, simulations=1000):
-    """Monte Carlo engine for risk-adjusted performance."""
     gdp_std = abs(row['gdp_growth'] * 0.1)
     infl_std = abs(row['inflation'] * 0.1)
     sim_gdp = np.random.normal(row['gdp_growth'], gdp_std, simulations)
@@ -73,17 +85,9 @@ def get_risk_adjusted_score(row, simulations=1000):
 
 if __name__ == "__main__":
     data = get_data_with_cache()
-    
-    # 1. Apply Risk-Adjusted Engine
     data['RISK_ADJ_SCORE'] = data.apply(get_risk_adjusted_score, axis=1)
-    
-    # 2. Results Breakdown
     results = data.sort_values(by='RISK_ADJ_SCORE', ascending=False)
     
-    print(f"\n{'='*60}\nMARKET ATTRACTIVENESS: COMPONENT BREAKDOWN\n{'='*60}")
-    print(results[['gdp_growth', 'inflation', 'infrastructure', 'RISK_ADJ_SCORE']])
-    
     print(f"\n{'='*60}\nMONTE CARLO RISK-ADJUSTED RANKING\n{'='*60}")
-    print(results[['RISK_ADJ_SCORE']])
-    
+    print(results[['gdp_growth', 'inflation', 'infrastructure', 'RISK_ADJ_SCORE']])
     results.to_csv(MASTER_FILE)
