@@ -20,17 +20,27 @@ jobs:
       - name: Execute Live Core Matrix Pipeline
         run: python main.py
 
+      - name: Display Historical Snapshot
+        run: |
+          python -c "
+          import pandas as pd
+          df = pd.read_csv('market_engine_cache/telemetry.csv')
+          print(f'\n{'='*60}\nLATEST HISTORICAL SNAPSHOT (LAST 20 ENTRIES)\n{'='*60}')
+          print(f'{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}')
+          for _, row in df.tail(20).iterrows():
+              print(f'{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {row['STATUS']:<10} {row['P/E']:<6} {row['MARGIN']}')
+          "
+
       - name: Commit and Save Telemetry
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
           if [ -f "market_engine_cache/telemetry.csv" ]; then
-            # Use -f to force add the ignored file
             git add -f market_engine_cache/telemetry.csv
             git commit -m "Automated Telemetry Update: $(date)"
             git push
           else
-            echo "Telemetry file not found."
+            echo "::error::Telemetry file not found."
             exit 1
           fi
