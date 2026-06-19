@@ -6,12 +6,12 @@ import numpy as np
 import yfinance as yf
 import requests
 
-# CONFIGURATION
-CACHE_DIR = "market_engine_cache"
+# CONFIGURATION - Use Absolute Path
+PROJECT_ROOT = os.getcwd()
+CACHE_DIR = os.path.join(PROJECT_ROOT, "market_engine_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 MASTER_FILE = os.path.join(CACHE_DIR, "telemetry.csv")
 
-# Map codes to World Bank ISOs
 COUNTRY_ISO_MAP = {
     "USA": "US", "CHN": "CN", "TWN": "TW", 
     "SAU": "SA", "KOR": "KR", "NLD": "NL"
@@ -31,7 +31,7 @@ TARGET_COMPANIES = {
 }
 
 def get_market_health(country_iso):
-    """Fetches macro data directly from World Bank API using requests."""
+    """Fetches macro data using requests."""
     try:
         url = f"https://api.worldbank.org/v2/country/{country_iso}/indicator/NY.GDP.MKTP.KD.ZG?format=json&date=2020:2025"
         response = requests.get(url, timeout=10)
@@ -57,12 +57,10 @@ def run_engine():
     ent_data, macro_summary = [], []
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    # Fetch Macro
     for iso, wb_code in COUNTRY_ISO_MAP.items():
         gdp, risk, viab = get_market_health(wb_code)
         macro_summary.append({"COUNTRY": iso, "GDP": gdp, "RISK": risk, "VIABILITY": viab})
 
-    # Fetch Performance
     for t in tickers:
         name, code, pe, margin = TARGET_COMPANIES[t]
         series = df[t].dropna()
@@ -74,17 +72,9 @@ def run_engine():
             "MARGIN": f"{margin*100:.0f}%"
         })
 
+    # Save using absolute path
     pd.DataFrame(ent_data).to_csv(MASTER_FILE, mode='a', index=False, header=not os.path.exists(MASTER_FILE))
-
-    print(f"\n{'='*60}\nREGIONAL MACRO-ENVIRONMENT (LIVE API DATA)\n{'='*60}")
-    print(f"{'COUNTRY':<10} {'5YR GDP':<12} {'RISK':<12} {'VIABILITY'}")
-    for m in macro_summary:
-        print(f"{m['COUNTRY']:<10} {m['GDP']:+<12.2f} {m['RISK']:<12} {m['VIABILITY']}")
-    
-    print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\nSystemic Risk Threshold: {var_95:.4f}\n{'='*60}")
-    print(f"{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}")
-    for row in sorted(ent_data, key=lambda x: x['STATUS'], reverse=True):
-        print(f"{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {row['STATUS']:<10} {row['P/E']:<6} {row['MARGIN']}")
+    print(f"DEBUG: Successfully wrote file to {MASTER_FILE}")
 
 if __name__ == "__main__":
     try:
