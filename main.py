@@ -32,6 +32,7 @@ def run_engine():
     tickers = sorted(list(TARGET_COMPANIES.keys()))
     df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)['Close']
     
+    # Calculate Risk Floor
     returns = df.pct_change(fill_method=None).dropna()
     cov_matrix = returns.cov().fillna(0) + np.eye(len(tickers)) * 1e-6
     sims = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
@@ -48,7 +49,6 @@ def run_engine():
         
         status = "REVIEW" if (mom/100) < var_95 else "STABLE"
         
-        # Append for Telemetry CSV
         ent_data.append({
             "TIMESTAMP": timestamp, "COUNTRY": code, "ENTERPRISE": name, "TICKER": t,
             "MOMENTUM": f"{mom:+.2f}%", "STATUS": status, "P/E": f"{pe:.1f}x", 
@@ -63,14 +63,19 @@ def run_engine():
     file_exists = os.path.isfile(MASTER_FILE)
     ent_df.to_csv(MASTER_FILE, mode='a', index=False, header=not file_exists)
 
-    # Print Report (No Emojis)
-    print(f"{'='*60}\nREGIONAL MACRO-ENVIRONMENT\n{'='*60}")
-    print(pd.DataFrame(cntry_data).to_string(index=False))
+    # PRINT REPORT (Optimized Layout)
+    print(f"\n{'='*60}\nREGIONAL MACRO-ENVIRONMENT\n{'='*60}")
+    print(f"{'COUNTRY':<8} {'HUB OSM':<8} {'GDP %':<8} {'INFL %':<8}")
+    for item in cntry_data:
+        print(f"{item['COUNTRY']:<8} {item['HUB OSM']:<8} {item['GDP %']:<8.2f} {item['INFL %']:<8.2f}")
     
     print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\nSystemic Risk Threshold (VaR 95%): {var_95:.4f}\n{'='*60}")
-    # Display formatted columns
-    display_df = ent_df[['ENTERPRISE', 'MOMENTUM', 'STATUS', 'P/E', 'MARGIN']]
-    print(display_df.to_string(index=False))
+    print(f"{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}")
+    
+    # Sort: Review items first
+    sorted_ent = sorted(ent_data, key=lambda x: x['STATUS'], reverse=True)
+    for row in sorted_ent:
+        print(f"{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {row['STATUS']:<10} {row['P/E']:<6} {row['MARGIN']}")
 
 if __name__ == "__main__":
     run_engine()
