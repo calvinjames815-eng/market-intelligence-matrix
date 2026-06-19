@@ -11,7 +11,7 @@ CACHE_DIR = "market_engine_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
 MASTER_FILE = os.path.join(CACHE_DIR, "telemetry.csv")
 
-# Map your codes to World Bank ISOs
+# Map codes to World Bank ISOs
 COUNTRY_ISO_MAP = {
     "USA": "US", "CHN": "CN", "TWN": "TW", 
     "SAU": "SA", "KOR": "KR", "NLD": "NL"
@@ -31,7 +31,7 @@ TARGET_COMPANIES = {
 }
 
 def get_market_health(country_iso):
-    """Fetches and calculates 5-year average macro health."""
+    """Fetches live 5-year average macro health from World Bank."""
     try:
         data = wb.download(indicator=['NY.GDP.MKTP.KD.ZG', 'FP.CPI.TOTL.ZG'], 
                            country=[country_iso], start=2020, end=2025)
@@ -47,6 +47,7 @@ def run_engine():
     tickers = sorted(list(TARGET_COMPANIES.keys()))
     df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)['Close']
     
+    # Risk Floor Calculation
     returns = df.pct_change(fill_method=None).dropna()
     cov_matrix = returns.cov().fillna(0) + np.eye(len(tickers)) * 1e-6
     sims = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
@@ -55,28 +56,31 @@ def run_engine():
     ent_data, macro_summary = [], []
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
+    # Fetch Macro
     for iso, wb_code in COUNTRY_ISO_MAP.items():
-        gdp_avg, inf_avg, risk, viab = get_market_health(wb_code)
-        macro_summary.append({"COUNTRY": iso, "GDP_GROWTH": gdp_avg, "RISK": risk, "VIABILITY": viab})
+        gdp, inf, risk, viab = get_market_health(wb_code)
+        macro_summary.append({"COUNTRY": iso, "GDP": gdp, "RISK": risk, "VIABILITY": viab})
 
+    # Fetch Performance
     for t in tickers:
         name, code, pe, margin = TARGET_COMPANIES[t]
         series = df[t].dropna()
         mom = ((series.iloc[-1] - series.iloc[-90]) / series.iloc[-90]) * 100
         status = "REVIEW" if (mom/100) < var_95 else "STABLE"
-        
         ent_data.append({
             "TIMESTAMP": timestamp, "COUNTRY": code, "ENTERPRISE": name,
             "MOMENTUM": f"{mom:+.2f}%", "STATUS": status, "P/E": f"{pe:.1f}x", 
             "MARGIN": f"{margin*100:.0f}%"
         })
 
+    # Write to CSV
     pd.DataFrame(ent_data).to_csv(MASTER_FILE, mode='a', index=False, header=not os.path.exists(MASTER_FILE))
 
-    print(f"\n{'='*60}\nREGIONAL MACRO-ENVIRONMENT (LIVE WORLD BANK DATA)\n{'='*60}")
+    # Clean Output
+    print(f"\n{'='*60}\nREGIONAL MACRO-ENVIRONMENT (LIVE DATA)\n{'='*60}")
     print(f"{'COUNTRY':<10} {'5YR GDP':<12} {'RISK':<12} {'VIABILITY'}")
     for m in macro_summary:
-        print(f"{m['COUNTRY']:<10} {m['GDP_GROWTH']:+<12.2f} {m['RISK']:<12} {m['VIABILITY']}")
+        print(f"{m['COUNTRY']:<10} {m['GDP']:+<12.2f} {m['RISK']:<12} {m['VIABILITY']}")
     
     print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\nSystemic Risk Threshold: {var_95:.4f}\n{'='*60}")
     print(f"{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}")
@@ -86,7 +90,6 @@ def run_engine():
 if __name__ == "__main__":
     try:
         run_engine()
-        print("\nPipeline execution completed successfully.")
     except Exception as e:
-        print(f"\nPipeline failed: {e}")
+        print(f"Pipeline failed: {e}")
         sys.exit(1)
