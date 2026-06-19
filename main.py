@@ -8,6 +8,7 @@ import yfinance as yf
 # CONFIGURATION
 CACHE_DIR = "market_engine_cache"
 os.makedirs(CACHE_DIR, exist_ok=True)
+MASTER_FILE = os.path.join(CACHE_DIR, "telemetry.csv")
 
 TARGET_COMPANIES = {
     "NVDA": ("NVIDIA", "USA", 32.4, 0.55), "AAPL": ("Apple", "USA", 28.1, 0.26),
@@ -38,6 +39,8 @@ def run_engine():
     var_95 = np.percentile(sims.sum(axis=2).mean(axis=1), 5)
 
     ent_data, cntry_data = [], []
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
     for t in tickers:
         name, code, pe, margin = TARGET_COMPANIES[t]
         osm, gdp, infl = MACRO_DATA.get(code, (0, 0.0, 0.0))
@@ -45,22 +48,29 @@ def run_engine():
         mom = ((series.iloc[-1] - series.iloc[-90]) / series.iloc[-90]) * 100
         
         status = "REVIEW" if (mom/100) < var_95 else "STABLE"
-        ent_data.append({"ENTERPRISE": name, "MOMENTUM": f"{mom:+.2f}%", "STATUS": status, "P/E": f"{pe:.1f}x", "MARGIN": f"{margin*100:.0f}%"})
+        ent_data.append({
+            "TIMESTAMP": timestamp,
+            "ENTERPRISE": name, 
+            "TICKER": t,
+            "MOMENTUM": f"{mom:+.2f}%", 
+            "STATUS": status, 
+            "P/E": f"{pe:.1f}x", 
+            "MARGIN": f"{margin*100:.0f}%"
+        })
         
         if not any(c['COUNTRY'] == code for c in cntry_data):
             cntry_data.append({"COUNTRY": code, "HUB OSM": osm, "GDP %": gdp, "INFL %": infl})
 
-    # Display and Cache
-    report_date = datetime.date.today()
+    # Save to telemetry.csv (Append Mode)
     ent_df = pd.DataFrame(ent_data)
-    cntry_df = pd.DataFrame(cntry_data)
-    
-    ent_df.to_csv(os.path.join(CACHE_DIR, f"enterprise_{report_date}.csv"), index=False)
+    file_exists = os.path.isfile(MASTER_FILE)
+    ent_df.to_csv(MASTER_FILE, mode='a', index=False, header=not file_exists)
 
+    # Print Report
     print(f"{'='*60}\nREGIONAL MACRO-ENVIRONMENT\n{'='*60}")
-    print(cntry_df.to_string(index=False))
+    print(pd.DataFrame(cntry_data).to_string(index=False))
     print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\nSystemic Risk Threshold (VaR 95%): {var_95:.4f}\n{'='*60}")
-    print(ent_df.to_string(index=False))
+    print(ent_df.drop(columns=['TIMESTAMP']).to_string(index=False))
 
 if __name__ == "__main__":
     run_engine()
