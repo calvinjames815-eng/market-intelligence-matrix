@@ -31,7 +31,6 @@ TARGET_COMPANIES = {
 }
 
 def get_market_health(country_iso):
-    """Fetches macro data directly from World Bank API."""
     try:
         url = f"https://api.worldbank.org/v2/country/{country_iso}/indicator/NY.GDP.MKTP.KD.ZG?format=json&date=2020:2025"
         data = requests.get(url, timeout=10).json()[1]
@@ -41,7 +40,6 @@ def get_market_health(country_iso):
         return 0.0
 
 def run_engine():
-    """Main processing engine."""
     tickers = sorted(list(TARGET_COMPANIES.keys()))
     df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)['Close']
     
@@ -53,37 +51,46 @@ def run_engine():
     ent_data, macro_summary = [], []
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
+    # Calculate Macro Data
     for iso, wb_code in COUNTRY_ISO_MAP.items():
         macro_summary.append({"COUNTRY": iso, "GDP": get_market_health(wb_code)})
+    
+    # Create lookup dictionary
+    macro_dict = {m['COUNTRY']: m['GDP'] for m in macro_summary}
 
+    # Calculate Enterprise Data
     for t in tickers:
         name, code, pe, margin = TARGET_COMPANIES[t]
         series = df[t].dropna()
         mom = ((series.iloc[-1] - series.iloc[-90]) / series.iloc[-90]) * 100
         status = "REVIEW" if (mom/100) < var_95 else "STABLE"
-        ent_data.append({"TIMESTAMP": timestamp, "COUNTRY": code, "ENTERPRISE": name,
-                         "MOMENTUM": f"{mom:+.2f}%", "STATUS": status, "P/E": f"{pe:.1f}x", 
-                         "MARGIN": f"{margin*100:.0f}%"})
+        
+        ent_data.append({
+            "TIMESTAMP": timestamp, 
+            "COUNTRY": code, 
+            "ENTERPRISE": name,
+            "MOMENTUM": f"{mom:+.2f}%", 
+            "STATUS": status, 
+            "P/E": f"{pe:.1f}x", 
+            "MARGIN": f"{margin*100:.0f}%",
+            "GDP_GROWTH": f"{macro_dict.get(code, 0):.2f}"
+        })
 
-    # Save to file
     pd.DataFrame(ent_data).to_csv(MASTER_FILE, mode='a', index=False, header=not os.path.exists(MASTER_FILE))
     return ent_data, macro_summary, var_95
 
 if __name__ == "__main__":
     try:
         ent_data, macro_summary, var_95 = run_engine()
-        
-        # Display Results
         print(f"\n{'='*60}\nREGIONAL MACRO-ENVIRONMENT\n{'='*60}")
         print(f"{'COUNTRY':<8} {'GDP %':<8} {'INFL %':<8}")
         for m in macro_summary:
             print(f"{m['COUNTRY']:<8} {m['GDP']:<8.2f} {'N/A':<8}")
         
-        print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\nSystemic Risk Threshold (VaR 95%): {var_95:.4f}\n{'='*60}")
+        print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\n{'='*60}")
         print(f"{'ENTERPRISE':<16} {'MOMENTUM':<12} {'STATUS':<10} {'P/E':<6} {'MARGIN'}")
         for row in sorted(ent_data, key=lambda x: x['STATUS'], reverse=True):
             print(f"{row['ENTERPRISE']:<16} {row['MOMENTUM']:<12} {row['STATUS']:<10} {row['P/E']:<6} {row['MARGIN']}")
-            
     except Exception as e:
         print(f"Pipeline failed: {e}")
         sys.exit(1)
