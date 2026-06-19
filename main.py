@@ -14,26 +14,30 @@ INDICATORS = {
 }
 
 def get_real_macro_data():
-    """Fetches data using verified ISO codes for the World Bank API."""
-    # Use standard 3-letter ISO codes that the World Bank is guaranteed to recognize
-    target_countries = {
-        "USA": "USA", "JPN": "JPN", "CHN": "CHN", "IND": "IND", 
-        "CHE": "CHE", "KOR": "KOR", "NLD": "NLD", "TWN": "TWN", 
-        "SAU": "SAU", "ARE": "ARE", "SGP": "SGP", "DEU": "DEU"
-    }
+    """Fetches data one by one to ensure pipeline stability."""
+    target_codes = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "TWN", "SAU", "ARE", "SGP", "DEU"]
+    all_data = []
+
+    for code in target_codes:
+        try:
+            # Fetch one country at a time
+            df = wbdata.get_dataframe(INDICATORS, country=code)
+            # Take only the most recent year
+            latest = df.tail(1)
+            latest['country'] = code
+            all_data.append(latest)
+        except Exception as e:
+            print(f"Skipping {code} due to API error: {e}")
     
-    # We pass the values (the codes) to the API
-    df = wbdata.get_dataframe(INDICATORS, country=list(target_countries.values()))
+    # Concatenate all successfully fetched data
+    full_df = pd.concat(all_data)
     
-    # Group by country and take the most recent data
-    df = df.groupby(level='country').last()
+    # Data Cleaning
+    full_df['gdp_growth'] = full_df['gdp_growth'].fillna(0) / 100
+    full_df['inflation'] = full_df['inflation'].fillna(0) / 100
+    full_df['infrastructure'] = 0.5 
     
-    # Data Cleaning: Ensure no NaNs exist to prevent calculation crashes
-    df['gdp_growth'] = df['gdp_growth'].fillna(0) / 100
-    df['inflation'] = df['inflation'].fillna(0) / 100
-    df['infrastructure'] = 0.5  # Placeholder
-    
-    return df
+    return full_df
 
 def calculate_attractiveness(row, weights=(0.5, 0.3, 0.2)):
     w_gdp, w_infl, w_infra = weights
