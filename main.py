@@ -2,30 +2,20 @@ import requests
 import pandas as pd
 import numpy as np
 
-# Configuration
 MASTER_FILE = "macro_scorecard.csv"
-# Using a list of codes that the World Bank API strictly recognizes
-COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "TWN", "SAU", "ARE", "SGP", "DEU"]
+COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "SAU", "ARE", "SGP", "DEU", "PHL", "MYS", "QAT", "BHR", "CAN", "FRA", "GBR"]
 
 def fetch_indicator(country_code, indicator_id):
-    """Fetches indicator data by forcing a date range search."""
-    # Added &date=2020:2026 to find recent valid data
-    # Added per_page=10 to ensure we get a few years if the latest is empty
+    # Using date=2020:2026 to find the most recent valid year
     url = f"https://api.worldbank.org/v2/country/{country_code}/indicator/{indicator_id}?format=json&date=2020:2026&per_page=10"
-    
     try:
         response = requests.get(url, timeout=15).json()
-        
-        # Parse through the response to find the first non-null value
         if len(response) > 1 and response[1]:
             for entry in response[1]:
                 if entry['value'] is not None:
                     return float(entry['value'])
-        
-        print(f"DEBUG: No data found for {country_code} on {indicator_id}")
         return 0.0
-    except Exception as e:
-        print(f"DEBUG: Error fetching {country_code}: {e}")
+    except Exception:
         return 0.0
 
 def get_real_macro_data():
@@ -47,13 +37,9 @@ def calculate_attractiveness(row, weights=(0.5, 0.3, 0.2)):
 
 if __name__ == "__main__":
     data = get_real_macro_data()
-    
-    print("--- DATA LOADED ---")
-    print(data)
-    
     data['SCORE'] = data.apply(calculate_attractiveness, axis=1)
     results = data.sort_values(by='SCORE', ascending=False)
     
-    print(f"\n{'='*40}\nFINAL MARKET ATTRACTIVENESS RANKING\n{'='*40}")
+    print(f"\n{'='*40}\nEXPANDED MARKET ATTRACTIVENESS RANKING\n{'='*40}")
     print(results[['SCORE']])
     results.to_csv(MASTER_FILE)
