@@ -15,9 +15,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install dependencies
-        run: |
-          pip install yfinance pandas numpy pandas-datareader
+     - name: Install dependencies
+      run: |
+        pip install yfinance numpy pandas-datareader
+        # Force a version of pandas that is compatible with pandas-datareader 0.10.0
+        pip install "pandas<2.0.0"
           
       - name: Execute Live Core Matrix Pipeline
         run: python main.py
