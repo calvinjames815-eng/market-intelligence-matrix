@@ -4,6 +4,16 @@ import datetime
 import pandas as pd
 import numpy as np
 import yfinance as yf
+
+if not hasattr(pd, 'deprecate_kwarg'):
+    from pandas.util._exceptions import find_stack_level
+    import warnings
+    def deprecate_kwarg(old_arg_name, new_arg_name, mapping=None, stacklevel=2):
+        def _deprecate(func):
+            return func
+        return _deprecate
+    pd.deprecate_kwarg = deprecate_kwarg
+
 from pandas_datareader import wb
 
 # CONFIGURATION
