@@ -15,16 +15,19 @@ INDICATORS = {
 
 def get_real_macro_data():
     """Fetches real data from World Bank."""
-    # Fetch data
-    df = wbdata.get_dataframe(INDICATORS, country=COUNTRIES, convert_date=True)
-    # Get the most recent non-null year for each country
-    df = df.groupby('country').last()
+    # Removed 'convert_date=True' as it is not a valid argument for get_dataframe
+    df = wbdata.get_dataframe(INDICATORS, country=COUNTRIES)
     
-    # Normalize/Clean data (Fill NaN with neutral values to prevent crashes)
-    df['gdp_growth'] = df['gdp_growth'].fillna(0) / 100 # Convert % to decimal
+    # Get the most recent non-null year for each country
+    # The dataframe returned by wbdata is multi-indexed by (country, date)
+    # We group by the level 'country' and take the last available entry
+    df = df.groupby(level='country').last()
+    
+    # Normalize/Clean data
+    df['gdp_growth'] = df['gdp_growth'].fillna(0) / 100 
     df['inflation'] = df['inflation'].fillna(0) / 100
     
-    # Placeholder for infrastructure density (OSM API would go here)
+    # Placeholder for infrastructure density
     df['infrastructure'] = 0.5 
     return df
 
