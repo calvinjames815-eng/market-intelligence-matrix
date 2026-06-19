@@ -28,6 +28,11 @@ jobs:
         run: |
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+      - name: Debug and Commit
+      run: |
+        echo "Checking for telemetry file..."
+        ls -la market_engine_cache/ || echo "Directory not found"
+        # ... rest of your git commands ...
           if [ -f "market_engine_cache/telemetry.csv" ]; then
             git add market_engine_cache/telemetry.csv
             git commit -m "Automated Telemetry Update: $(date)"
