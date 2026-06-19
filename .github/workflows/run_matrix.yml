@@ -22,26 +22,26 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-  run: |
-    pip install yfinance pandas numpy pandas-datareader
+      run: |
+        pip install yfinance pandas numpy pandas-datareader
 
-     - name: Execute Live Core Matrix Pipeline
-        run: |
-          # If your script is in a folder, move to it first
-          # cd scripts/ 
-          python main.py
+    - name: Execute Live Core Matrix Pipeline
+      run: |
+        # If your script is in a folder, move to it first
+        # cd scripts/ 
+        python main.py
 
     - name: Commit and Save Telemetry
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          
-          # Only proceed if the file was actually generated
-          if [ -f "market_engine_cache/telemetry.csv" ]; then
-            git add market_engine_cache/telemetry.csv
-            git commit -m "Automated Telemetry Update: $(date)"
-            git push
-          else
-            echo "Telemetry file not found. Skipping commit."
-            exit 0
-          fi
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+        
+        # Only proceed if the file was actually generated
+        if [ -f "market_engine_cache/telemetry.csv" ]; then
+          git add market_engine_cache/telemetry.csv
+          git commit -m "Automated Telemetry Update: $(date)"
+          git push
+        else
+          echo "Telemetry file not found. Skipping commit."
+          exit 0
+        fi
