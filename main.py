@@ -32,7 +32,6 @@ def run_engine():
     tickers = sorted(list(TARGET_COMPANIES.keys()))
     df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)['Close']
     
-    # Calculate Risk Floor
     returns = df.pct_change(fill_method=None).dropna()
     cov_matrix = returns.cov().fillna(0) + np.eye(len(tickers)) * 1e-6
     sims = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
@@ -49,25 +48,17 @@ def run_engine():
         
         status = "REVIEW" if (mom/100) < var_95 else "STABLE"
         
-        # Append all telemetry data for CSV recording
+        # Append for Telemetry CSV
         ent_data.append({
-            "TIMESTAMP": timestamp,
-            "COUNTRY": code,
-            "ENTERPRISE": name, 
-            "TICKER": t,
-            "MOMENTUM": f"{mom:+.2f}%", 
-            "STATUS": status, 
-            "P/E": f"{pe:.1f}x", 
-            "MARGIN": f"{margin*100:.0f}%",
-            "HUB OSM": osm,
-            "GDP %": gdp,
-            "INFL %": infl
+            "TIMESTAMP": timestamp, "COUNTRY": code, "ENTERPRISE": name, "TICKER": t,
+            "MOMENTUM": f"{mom:+.2f}%", "STATUS": status, "P/E": f"{pe:.1f}x", 
+            "MARGIN": f"{margin*100:.0f}%", "HUB OSM": osm, "GDP %": gdp, "INFL %": infl
         })
         
         if not any(c['COUNTRY'] == code for c in cntry_data):
             cntry_data.append({"COUNTRY": code, "HUB OSM": osm, "GDP %": gdp, "INFL %": infl})
 
-    # Save to telemetry.csv (Append Mode)
+    # Save to telemetry.csv
     ent_df = pd.DataFrame(ent_data)
     file_exists = os.path.isfile(MASTER_FILE)
     ent_df.to_csv(MASTER_FILE, mode='a', index=False, header=not file_exists)
@@ -75,9 +66,11 @@ def run_engine():
     # Print Report (No Emojis)
     print(f"{'='*60}\nREGIONAL MACRO-ENVIRONMENT\n{'='*60}")
     print(pd.DataFrame(cntry_data).to_string(index=False))
+    
     print(f"\n{'='*60}\nENTERPRISE PERFORMANCE MATRIX\nSystemic Risk Threshold (VaR 95%): {var_95:.4f}\n{'='*60}")
-    # Display subset of columns for clean terminal view
-    print(ent_df[['ENTERPRISE', 'MOMENTUM', 'STATUS', 'P/E', 'MARGIN']].to_string(index=False))
+    # Display formatted columns
+    display_df = ent_df[['ENTERPRISE', 'MOMENTUM', 'STATUS', 'P/E', 'MARGIN']]
+    print(display_df.to_string(index=False))
 
 if __name__ == "__main__":
     run_engine()
