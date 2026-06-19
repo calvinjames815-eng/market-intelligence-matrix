@@ -4,17 +4,7 @@ import datetime
 import pandas as pd
 import numpy as np
 import yfinance as yf
-
-if not hasattr(pd, 'deprecate_kwarg'):
-    from pandas.util._exceptions import find_stack_level
-    import warnings
-    def deprecate_kwarg(old_arg_name, new_arg_name, mapping=None, stacklevel=2):
-        def _deprecate(func):
-            return func
-        return _deprecate
-    pd.deprecate_kwarg = deprecate_kwarg
-
-from pandas_datareader import wb
+import requests
 
 # CONFIGURATION
 CACHE_DIR = "market_engine_cache"
@@ -41,23 +31,24 @@ TARGET_COMPANIES = {
 }
 
 def get_market_health(country_iso):
-    """Fetches live 5-year average macro health from World Bank."""
+    """Fetches macro data directly from World Bank API using requests."""
     try:
-        data = wb.download(indicator=['NY.GDP.MKTP.KD.ZG', 'FP.CPI.TOTL.ZG'], 
-                           country=[country_iso], start=2020, end=2025)
-        avg_growth = data['NY.GDP.MKTP.KD.ZG'].tail(5).mean()
-        avg_infl = data['FP.CPI.TOTL.ZG'].tail(5).mean()
+        url = f"https://api.worldbank.org/v2/country/{country_iso}/indicator/NY.GDP.MKTP.KD.ZG?format=json&date=2020:2025"
+        response = requests.get(url, timeout=10)
+        data = response.json()[1]
+        values = [item['value'] for item in data if item['value'] is not None]
+        avg_growth = sum(values) / len(values) if values else 0
+        
         rating = "LOW" if avg_growth > 2.0 else "MODERATE"
         viability = "STABLE" if avg_growth > 2.0 else "WATCH"
-        return avg_growth, avg_infl, rating, viability
+        return avg_growth, rating, viability
     except:
-        return 0.0, 0.0, "N/A", "N/A"
+        return 0.0, "N/A", "N/A"
 
 def run_engine():
     tickers = sorted(list(TARGET_COMPANIES.keys()))
     df = yf.download(tickers, period="1y", progress=False, auto_adjust=True)['Close']
     
-    # Risk Floor Calculation
     returns = df.pct_change(fill_method=None).dropna()
     cov_matrix = returns.cov().fillna(0) + np.eye(len(tickers)) * 1e-6
     sims = np.random.multivariate_normal(returns.mean().values, cov_matrix, (10000, 5))
@@ -68,7 +59,7 @@ def run_engine():
     
     # Fetch Macro
     for iso, wb_code in COUNTRY_ISO_MAP.items():
-        gdp, inf, risk, viab = get_market_health(wb_code)
+        gdp, risk, viab = get_market_health(wb_code)
         macro_summary.append({"COUNTRY": iso, "GDP": gdp, "RISK": risk, "VIABILITY": viab})
 
     # Fetch Performance
@@ -83,11 +74,9 @@ def run_engine():
             "MARGIN": f"{margin*100:.0f}%"
         })
 
-    # Write to CSV
     pd.DataFrame(ent_data).to_csv(MASTER_FILE, mode='a', index=False, header=not os.path.exists(MASTER_FILE))
 
-    # Clean Output
-    print(f"\n{'='*60}\nREGIONAL MACRO-ENVIRONMENT (LIVE DATA)\n{'='*60}")
+    print(f"\n{'='*60}\nREGIONAL MACRO-ENVIRONMENT (LIVE API DATA)\n{'='*60}")
     print(f"{'COUNTRY':<10} {'5YR GDP':<12} {'RISK':<12} {'VIABILITY'}")
     for m in macro_summary:
         print(f"{m['COUNTRY']:<10} {m['GDP']:+<12.2f} {m['RISK']:<12} {m['VIABILITY']}")
