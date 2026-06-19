@@ -66,6 +66,12 @@ def run_engine():
     file_exists = os.path.isfile(MASTER_FILE)
     ent_df.to_csv(MASTER_FILE, mode='a', index=False, header=not file_exists)
 
+    if os.path.exists(MASTER_FILE):
+        print(f"DEBUG: File successfully created at {MASTER_FILE}")
+        print(f"DEBUG: File size: {os.path.getsize(MASTER_FILE)} bytes")
+    else:
+        print("DEBUG: CRITICAL ERROR - File not found!")
+
     # Print Report
     print(f"{'='*60}\nREGIONAL MACRO-ENVIRONMENT\n{'='*60}")
     print(pd.DataFrame(cntry_data).to_string(index=False))
