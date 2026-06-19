@@ -25,12 +25,12 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           
-          # The script ensures the file is at market_engine_cache/telemetry.csv
           if [ -f "market_engine_cache/telemetry.csv" ]; then
-            git add market_engine_cache/telemetry.csv
+            # Use -f to force add the ignored file
+            git add -f market_engine_cache/telemetry.csv
             git commit -m "Automated Telemetry Update: $(date)"
             git push
           else
-            echo "::error::Telemetry file not found in market_engine_cache/"
+            echo "Telemetry file not found."
             exit 1
           fi
