@@ -36,9 +36,11 @@ jobs:
         run: | 
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          # Use -f to force add despite .gitignore
-          git add -f macro_scorecard.csv market_engine_cache.csv
           
+          # Only add the file that exists
+          git add -f market_engine_cache.csv
+          
+          # Check for changes
           if git diff --quiet && git diff --cached --quiet; then
             echo "No changes to commit"
           else
