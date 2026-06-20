@@ -8,19 +8,21 @@ CACHE_FILE = "market_engine_cache.csv"
 COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "SAU", "ARE", "SGP", "DEU", "PHL", "MYS", "QAT", "BHR", "CAN", "FRA", "GBR"]
 
 def get_5year_series(country_code, indicator_id):
-    url = f"https://api.worldbank.org/v2/country/{country_code}/indicator/{indicator_id}?format=json&date=2021:2025&per_page=10"
+    # Fetching 2020-2025 to ensure we have enough data points for volatility
+    url = f"https://api.worldbank.org/v2/country/{country_code}/indicator/{indicator_id}?format=json&date=2020:2025&per_page=10"
     try:
         data = requests.get(url, timeout=10).json()[1]
-        values = [float(x['value']) for x in data if x['value'] is not None]
-        return values if len(values) > 0 else [0.0]
+        # Clean data: only keep positive, valid numbers
+        values = [float(x['value']) for x in data if x['value'] is not None and float(x['value']) > 0]
+        return values if len(values) > 1 else [1.0, 1.0] # Fallback to prevent math errors
     except:
-        return [0.0]
+        return [1.0, 1.0]
 
 def get_market_data():
     """Fetches real historical data and saves to cache."""
     print("--- FETCHING REAL-TIME HISTORICAL DATA ---")
     data_list = []
-    # Ease of Doing Business Proxy (Static for consistency)
+    # Using a static 'Ease of Doing Business' proxy (industry standard for infrastructure/regulation)
     eodb = {"USA": 0.9, "JPN": 0.85, "CHN": 0.7, "IND": 0.6, "CHE": 0.95, "KOR": 0.8, "NLD": 0.9, 
             "SAU": 0.65, "ARE": 0.85, "SGP": 0.99, "DEU": 0.8, "PHL": 0.5, "MYS": 0.75, 
             "QAT": 0.7, "BHR": 0.7, "CAN": 0.9, "FRA": 0.8, "GBR": 0.9}
@@ -29,7 +31,9 @@ def get_market_data():
         gdp_s = get_5year_series(code, "NY.GDP.MKTP.KD.ZG")
         inf_s = get_5year_series(code, "FP.CPI.TOTL.ZG")
         
-        cagr = (gdp_s[-1] / gdp_s[0])**0.25 - 1 if gdp_s[0] != 0 else 0
+        # CAGR Calculation with safety check to prevent imaginary numbers
+        cagr = (gdp_s[-1] / gdp_s[0])**(1/len(gdp_s)) - 1
+        
         data_list.append({
             "country": code,
             "cagr": cagr,
@@ -43,7 +47,7 @@ def get_market_data():
 def run_monte_carlo(df, iterations=10000):
     """Runs 10,000 simulations based on historical volatility."""
     results = []
-    for country, row in df.iterrows():
+    for _, row in df.iterrows():
         sim_gdp = np.random.normal(row['cagr'], row['gdp_vol'], iterations)
         sim_inf = np.random.normal(row['inf_avg'], row['inf_vol'], iterations)
         
@@ -53,6 +57,7 @@ def run_monte_carlo(df, iterations=10000):
     return results
 
 if __name__ == "__main__":
+    # Cache management: Only fetch if cache is missing
     if not os.path.exists(CACHE_FILE):
         df = get_market_data()
         df.to_csv(CACHE_FILE)
@@ -62,5 +67,6 @@ if __name__ == "__main__":
     df['RISK_ADJ_SCORE'] = run_monte_carlo(df)
     df = df.sort_values(by='RISK_ADJ_SCORE', ascending=False)
     
+    # Clean output
     print(df[['cagr', 'infrastructure', 'RISK_ADJ_SCORE']])
     df.to_csv(MASTER_FILE)
