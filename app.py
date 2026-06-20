@@ -14,7 +14,6 @@ def load_data():
 df = load_data()
 
 # 3. GE-McKinsey Matrix Visualization
-# Assuming your CSV has 'Market_Name', 'Attractiveness_Score', 'Competitive_Strength'
 fig = px.scatter(
     df, 
     x="Competitive_Strength", 
