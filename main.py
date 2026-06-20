@@ -2,81 +2,65 @@ import requests
 import pandas as pd
 import numpy as np
 import os
-import time
 
 MASTER_FILE = "macro_scorecard.csv"
 CACHE_FILE = "market_engine_cache.csv"
 COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "SAU", "ARE", "SGP", "DEU", "PHL", "MYS", "QAT", "BHR", "CAN", "FRA", "GBR"]
 
-def fetch_indicator(country_code, indicator_id):
-    url = f"https://api.worldbank.org/v2/country/{country_code}/indicator/{indicator_id}?format=json&date=2020:2026&per_page=10"
+def get_5year_series(country_code, indicator_id):
+    url = f"https://api.worldbank.org/v2/country/{country_code}/indicator/{indicator_id}?format=json&date=2021:2025&per_page=10"
     try:
-        response = requests.get(url, timeout=15).json()
-        if len(response) > 1 and response[1]:
-            for entry in response[1]:
-                if entry['value'] is not None:
-                    return float(entry['value'])
-        return 0.0
-    except Exception:
-        return 0.0
+        data = requests.get(url, timeout=10).json()[1]
+        values = [float(x['value']) for x in data if x['value'] is not None]
+        return values if len(values) > 0 else [0.0]
+    except:
+        return [0.0]
 
-def get_real_macro_data():
-    """Fetches macro data normally, then performs one bulk OSM request."""
+def get_market_data():
+    """Fetches real historical data and saves to cache."""
+    print("--- FETCHING REAL-TIME HISTORICAL DATA ---")
     data_list = []
-    print(f"--- FETCHING MACRO DATA FOR {len(COUNTRIES)} COUNTRIES ---")
+    # Ease of Doing Business Proxy (Static for consistency)
+    eodb = {"USA": 0.9, "JPN": 0.85, "CHN": 0.7, "IND": 0.6, "CHE": 0.95, "KOR": 0.8, "NLD": 0.9, 
+            "SAU": 0.65, "ARE": 0.85, "SGP": 0.99, "DEU": 0.8, "PHL": 0.5, "MYS": 0.75, 
+            "QAT": 0.7, "BHR": 0.7, "CAN": 0.9, "FRA": 0.8, "GBR": 0.9}
+
     for code in COUNTRIES:
-        gdp = fetch_indicator(code, "NY.GDP.MKTP.KD.ZG")
-        inf = fetch_indicator(code, "FP.CPI.TOTL.ZG")
-        data_list.append({"country": code, "gdp_growth": gdp/100, "inflation": inf/100})
-    
-    df = pd.DataFrame(data_list).set_index('country')
-    
-    # ONE BULK OSM QUERY to avoid individual API throttling
-    print("--- PERFORMING BULK OSM QUERY ---")
-    overpass_url = "https://overpass-api.de/api/interpreter"
-    
-    # We use a header to satisfy the 406 Not Acceptable error
-    headers = {'User-Agent': 'MarketSimulator/1.0'}
-    
-    # For bulk processing, we use a single query structure
-    # Note: Bulk query results from Overpass are complex to map to specific countries
-    # This sets a base infrastructure score; adjust as needed for your model.
-    df['infrastructure'] = 0.5 
-    
-    print("--- BULK QUERY SUCCESSFUL ---")
-    return df
+        gdp_s = get_5year_series(code, "NY.GDP.MKTP.KD.ZG")
+        inf_s = get_5year_series(code, "FP.CPI.TOTL.ZG")
+        
+        cagr = (gdp_s[-1] / gdp_s[0])**0.25 - 1 if gdp_s[0] != 0 else 0
+        data_list.append({
+            "country": code,
+            "cagr": cagr,
+            "gdp_vol": np.std(gdp_s) / 100,
+            "inf_avg": np.mean(inf_s) / 100,
+            "inf_vol": np.std(inf_s) / 100,
+            "infrastructure": eodb.get(code, 0.5)
+        })
+    return pd.DataFrame(data_list).set_index('country')
 
-def get_data_with_cache():
-    if os.path.exists(CACHE_FILE):
-        file_time = os.path.getmtime(CACHE_FILE)
-        if (time.time() - file_time) < 86400: # 24 hours
-            print(f"--- LOADING FROM CACHE: {CACHE_FILE} ---")
-            return pd.read_csv(CACHE_FILE, index_col='country')
-        else:
-            print("--- CACHE EXPIRED. REFRESHING ---")
-    
-    data = get_real_macro_data()
-    data.to_csv(CACHE_FILE)
-    return data
-
-def get_risk_adjusted_score(row, simulations=1000):
-    gdp_std = abs(row['gdp_growth'] * 0.1)
-    infl_std = abs(row['inflation'] * 0.1)
-    sim_gdp = np.random.normal(row['gdp_growth'], gdp_std, simulations)
-    sim_infl = np.random.normal(row['inflation'], infl_std, simulations)
-    scores = (0.5 * sim_gdp) - (0.3 * sim_infl) + (0.2 * row['infrastructure'])
-    return scores.mean()
+def run_monte_carlo(df, iterations=10000):
+    """Runs 10,000 simulations based on historical volatility."""
+    results = []
+    for country, row in df.iterrows():
+        sim_gdp = np.random.normal(row['cagr'], row['gdp_vol'], iterations)
+        sim_inf = np.random.normal(row['inf_avg'], row['inf_vol'], iterations)
+        
+        # Scoring: 60% Growth, -40% Inflation, +20% Infra Proxy
+        scores = (0.6 * sim_gdp) - (0.4 * sim_inf) + (0.2 * row['infrastructure'])
+        results.append(scores.mean())
+    return results
 
 if __name__ == "__main__":
-    data = get_data_with_cache()
+    if not os.path.exists(CACHE_FILE):
+        df = get_market_data()
+        df.to_csv(CACHE_FILE)
+    else:
+        df = pd.read_csv(CACHE_FILE, index_col='country')
+        
+    df['RISK_ADJ_SCORE'] = run_monte_carlo(df)
+    df = df.sort_values(by='RISK_ADJ_SCORE', ascending=False)
     
-    # Apply Monte Carlo Engine
-    data['RISK_ADJ_SCORE'] = data.apply(get_risk_adjusted_score, axis=1)
-    
-    # Sort and Print
-    results = data.sort_values(by='RISK_ADJ_SCORE', ascending=False)
-    
-    print(f"\n{'='*60}\nMONTE CARLO RISK-ADJUSTED RANKING\n{'='*60}")
-    print(results[['gdp_growth', 'inflation', 'infrastructure', 'RISK_ADJ_SCORE']])
-    
-    results.to_csv(MASTER_FILE)
+    print(df[['cagr', 'infrastructure', 'RISK_ADJ_SCORE']])
+    df.to_csv(MASTER_FILE)
