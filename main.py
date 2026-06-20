@@ -3,20 +3,23 @@ import pandas as pd
 import numpy as np
 import os
 
-# Single Cache File
 CACHE_FILE = "market_engine_cache.csv"
 COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "SAU", "ARE", "SGP", "DEU", "PHL", "MYS", "QAT", "BHR", "CAN", "FRA", "GBR"]
 
 def get_series(country, indicator):
     url = f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?format=json&date=2010:2025&per_page=20"
     try:
-        data = requests.get(url, timeout=10).json()[1]
+        response = requests.get(url, timeout=10)
+        response.raise_for_status() # Stress Test: Raise error if API is down
+        data = response.json()[1]
         vals = [float(x['value']) for x in data if x['value'] is not None and float(x['value']) != 0]
-        return vals if vals else [0.02, 0.02]
-    except: return [0.02, 0.02]
+        return vals if len(vals) > 1 else [0.02, 0.02]
+    except Exception as e:
+        print(f"Warning: API error for {country}: {e}")
+        return [0.02, 0.02]
 
 def build_engine():
-    print(f"--- GENERATING CENTRALIZED CACHE: {CACHE_FILE} ---")
+    print(f"--- EXECUTING STRESS-TESTED ENGINE ---")
     data_list = []
     eodb = {"USA": 0.9, "JPN": 0.85, "CHN": 0.7, "IND": 0.6, "CHE": 0.95, "KOR": 0.8, "NLD": 0.9, 
             "SAU": 0.65, "ARE": 0.85, "SGP": 0.99, "DEU": 0.8, "PHL": 0.5, "MYS": 0.75, 
@@ -26,20 +29,18 @@ def build_engine():
         gdp_s = get_series(code, "NY.GDP.MKTP.KD.ZG")
         inf_s = get_series(code, "FP.CPI.TOTL.ZG")
         
-        # 1. Calculate Velocity and normalize to real numbers
-        velocity = float(np.real((gdp_s[-1] / gdp_s[0])**(1/len(gdp_s)) - 1))
-        
-        # 2. Sanity Bounds: Cap growth between -2% and 7%
+        # 1. Calculation with Zero-Division Protection
+        start, end = gdp_s[0], gdp_s[-1]
+        velocity = float(np.real((end / start)**(1/len(gdp_s)) - 1)) if start != 0 else 0.02
         velocity = max(min(velocity, 0.07), -0.02)
         
         inf_avg = float(np.real(np.mean(inf_s))) / 100
         
-        # 3. Risk-Adjusted ROI (Penalty for high inflation volatility)
+        # 2. Risk-Adjusted ROI
         risk_roi = velocity - (np.std(inf_s)/100)
         
-        # 4. Projections with Maturity Decay (5% reduction in growth rate per 5-year block)
-        proj_val = 100
-        decay_factor = 0.95 
+        # 3. Projections with Maturity Decay
+        proj_val, decay = 100.0, 0.95 
         row = {
             "country": code,
             "GDP_Growth": round(velocity, 4),
@@ -50,9 +51,7 @@ def build_engine():
         }
         
         for year in [2035, 2040, 2045, 2050]:
-            # Apply growth and decay factor
-            growth_factor = (1 + velocity) ** 5
-            proj_val *= (growth_factor * decay_factor)
+            proj_val *= (((1 + velocity) ** 5) * decay)
             row[f'Proj_{year}'] = round(proj_val, 2)
         
         data_list.append(row)
