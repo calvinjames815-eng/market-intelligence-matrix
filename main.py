@@ -8,14 +8,6 @@ CACHE_FILE = "market_engine_cache.csv"
 MASTER_FILE = "macro_scorecard.csv"
 COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "SAU", "ARE", "SGP", "DEU", "PHL", "MYS", "QAT", "BHR", "CAN", "FRA", "GBR"]
 
-def get_series(country, indicator):
-    url = f"https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?format=json&date=2010:2025&per_page=20"
-    try:
-        data = requests.get(url, timeout=10).json()[1]
-        vals = [float(x['value']) for x in data if x['value'] is not None and float(x['value']) != 0]
-        return vals if vals else [0.02, 0.02]
-    except: return [0.02, 0.02]
-
 def build_engine():
     print(f"--- GENERATING CACHE FILE: {CACHE_FILE} ---")
     data_list = []
@@ -27,10 +19,17 @@ def build_engine():
         gdp_s = get_series(code, "NY.GDP.MKTP.KD.ZG")
         inf_s = get_series(code, "FP.CPI.TOTL.ZG")
         
-        velocity = (gdp_s[-1] / gdp_s[0])**(1/len(gdp_s)) - 1
-        inf_avg = np.mean(inf_s) / 100
+        # 1. Force real-number math for velocity (CAGR)
+        # We use np.abs() and np.real() to strip away any 'j' components
+        raw_velocity = (gdp_s[-1] / gdp_s[0])**(1/len(gdp_s)) - 1
+        velocity = float(np.real(raw_velocity))
         
-        sims = np.random.normal(velocity, np.std(gdp_s)/100, 10000)
+        # 2. Ensure volatility is also a simple float
+        gdp_vol = float(np.real(np.std(gdp_s))) / 100
+        inf_avg = float(np.real(np.mean(inf_s))) / 100
+        
+        # 3. Safe Monte Carlo: Use the real-number velocity and volatility
+        sims = np.random.normal(velocity, gdp_vol, 10000)
         risk_roi = np.percentile(sims, 5)
         
         row = {
@@ -43,12 +42,12 @@ def build_engine():
         }
         
         for year in [2035, 2040, 2045, 2050]:
-            row[f'Proj_{year}'] = round(100 * ((1 + velocity) ** (year - 2025)), 2)
+            # Use abs() to ensure projection math stays in the real domain
+            row[f'Proj_{year}'] = round(100 * ((1 + abs(velocity)) ** (year - 2025)), 2)
         
         data_list.append(row)
     
     df = pd.DataFrame(data_list).set_index('country')
-    # Save the cache so it appears in your GitHub folder
     df.to_csv(CACHE_FILE)
     df.to_csv(MASTER_FILE)
     return df
