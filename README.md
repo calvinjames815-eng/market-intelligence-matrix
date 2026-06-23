@@ -1,7 +1,6 @@
 # Global Market Entry Simulation Engine
 
-![Market Matrix](<img width="1272" height="520" alt="matrix" src="https://github.com/user-attachments/assets/922132de-d4d1-46e6-a9f9-9f167a04e35b" />
-)
+![Market Matrix]
 
 ## Executive Summary
 
