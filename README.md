@@ -10,6 +10,14 @@ This project is a consultant-grade strategic decision-support tool designed to r
 
 ---
 
+## Project Documentation
+
+To understand the rationale behind the engine's design, mathematical modeling, and strategic framework, please refer to the detailed project case study:
+
+[📄 Download Market Entry Simulation Case Study (PDF)](link-to-your-pdf-file)
+
+---
+
 ## Strategic Methodology
 
 The engine evaluates market attractiveness through the lens of the **GE-McKinsey Nine-Box Matrix**. Key inputs are synthesized into a `RISK_ADJ_SCORE` using a weighted framework:
@@ -68,7 +76,3 @@ The dashboard is deployed on Streamlit Cloud and keeps itself updated via GitHub
    ```
 
 ---
-
-- **Consulting Methodology:** Demonstrates proficiency in applying strategic frameworks (GE-McKinsey) to raw datasets.
-- **Engineering Rigor:** Implements CI/CD for data pipelines, ensuring that the "source of truth" remains current without manual intervention.
-- **Business Focus:** Prioritizes actionable insights ("Target," "Watch," "Avoid") to facilitate faster, data-driven leadership decisions.
