@@ -29,18 +29,15 @@ def build_engine():
         gdp_s = get_series(code, "NY.GDP.MKTP.KD.ZG")
         inf_s = get_series(code, "FP.CPI.TOTL.ZG")
         
-        # Velocity and bounds
         velocity = float(np.real((gdp_s[-1] / gdp_s[0])**(1/len(gdp_s)) - 1))
         velocity = max(min(velocity, 0.07), -0.02)
         
-        # Stochastic Shock: Add variance to prevent "identical twin" projections
         shock = np.random.normal(0, 0.005) 
         stoch_vel = max(min(velocity + shock, 0.07), -0.02)
         
         inf_avg = float(np.real(np.mean(inf_s))) / 100
         risk_roi = velocity - (np.std(inf_s)/100)
         
-        # Scoring
         score = (velocity * 0.6) - (inf_avg * 0.2) + (eodb.get(code, 0.5) * 0.2)
         
         row = {
@@ -52,7 +49,6 @@ def build_engine():
             "RISK_ADJ_SCORE": round(score, 4)
         }
         
-        # Maturity Decay projections using Stochastically shocked velocity
         proj_val, decay = 100.0, 0.95 
         for year in [2035, 2040, 2045, 2050]:
             proj_val *= (((1 + stoch_vel) ** 5) * decay)
@@ -60,19 +56,23 @@ def build_engine():
         
         data_list.append(row)
     
-    df = pd.DataFrame(data_list).set_index('country')
+    df = pd.DataFrame(data_list) # Keep country as a column for CSV clarity
+    
+    # DYNAMIC SCORING: Use quantiles to ensure a split of Target/Watch/Avoid
+    low_thresh = df['RISK_ADJ_SCORE'].quantile(0.33)
+    high_thresh = df['RISK_ADJ_SCORE'].quantile(0.66)
     
     df['Recommendation'] = pd.cut(
         df['RISK_ADJ_SCORE'], 
-        bins=[-float('inf'), 0.05, 0.08, float('inf')], 
+        bins=[-float('inf'), low_thresh, high_thresh, float('inf')], 
         labels=['Avoid', 'Watch', 'Target']
     )
     
     df['Last_Updated'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
-    df.to_csv(CACHE_FILE)
+    df.to_csv(CACHE_FILE, index=False) # index=False is cleaner for web apps
     return df
 
 if __name__ == "__main__":
     df = build_engine()
-    print(df.to_string())
+    print(df.head())
