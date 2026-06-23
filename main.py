@@ -2,7 +2,7 @@ import requests
 import pandas as pd
 import numpy as np
 import os
-import datetime 
+import datetime
 
 CACHE_FILE = "market_engine_cache.csv"
 COUNTRIES = ["USA", "JPN", "CHN", "IND", "CHE", "KOR", "NLD", "SAU", "ARE", "SGP", "DEU", "PHL", "MYS", "QAT", "BHR", "CAN", "FRA", "GBR"]
@@ -32,10 +32,16 @@ def build_engine():
         # Velocity and bounds
         velocity = float(np.real((gdp_s[-1] / gdp_s[0])**(1/len(gdp_s)) - 1))
         velocity = max(min(velocity, 0.07), -0.02)
-        inf_avg = float(np.real(np.mean(inf_s))) / 100
         
-        # Risk-Adjusted ROI
+        # Stochastic Shock: Add variance to prevent "identical twin" projections
+        shock = np.random.normal(0, 0.005) 
+        stoch_vel = max(min(velocity + shock, 0.07), -0.02)
+        
+        inf_avg = float(np.real(np.mean(inf_s))) / 100
         risk_roi = velocity - (np.std(inf_s)/100)
+        
+        # Scoring
+        score = (velocity * 0.6) - (inf_avg * 0.2) + (eodb.get(code, 0.5) * 0.2)
         
         row = {
             "country": code,
@@ -43,18 +49,24 @@ def build_engine():
             "Inflation": round(inf_avg, 4),
             "Infrastructure": eodb.get(code, 0.5),
             "Risk_Adjusted_ROI": round(risk_roi, 4),
-            "RISK_ADJ_SCORE": round((velocity * 0.6) - (inf_avg * 0.2) + (eodb.get(code, 0.5) * 0.2), 4)
+            "RISK_ADJ_SCORE": round(score, 4)
         }
         
-        # Maturity Decay projections
+        # Maturity Decay projections using Stochastically shocked velocity
         proj_val, decay = 100.0, 0.95 
         for year in [2035, 2040, 2045, 2050]:
-            proj_val *= (((1 + velocity) ** 5) * decay)
+            proj_val *= (((1 + stoch_vel) ** 5) * decay)
             row[f'Proj_{year}'] = round(proj_val, 2)
         
         data_list.append(row)
     
     df = pd.DataFrame(data_list).set_index('country')
+    
+    df['Recommendation'] = pd.cut(
+        df['RISK_ADJ_SCORE'], 
+        bins=[-float('inf'), 0.05, 0.08, float('inf')], 
+        labels=['Avoid', 'Watch', 'Target']
+    )
     
     df['Last_Updated'] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
