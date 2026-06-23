@@ -1,6 +1,6 @@
 # Global Market Entry Simulation Engine
 
-![Market Matrix]
+![Market Matrix](matrix.png)
 
 ## Executive Summary
 
@@ -68,8 +68,6 @@ The dashboard is deployed on Streamlit Cloud and keeps itself updated via GitHub
    ```
 
 ---
-
-## Portfolio Impact
 
 - **Consulting Methodology:** Demonstrates proficiency in applying strategic frameworks (GE-McKinsey) to raw datasets.
 - **Engineering Rigor:** Implements CI/CD for data pipelines, ensuring that the "source of truth" remains current without manual intervention.
