@@ -1,9 +1,76 @@
-Global Market Entry Simulation Engine🚀 Live Dashboard: Market Entry SimulatorExecutive SummaryThe Market Entry Simulation Engine is an automated, consultant-grade decision-support tool designed to identify and rank high-potential global markets. By synthesizing real-time World Bank economic indicators with a proprietary risk-adjusted ROI framework, this engine enables data-driven strategic planning for international corporate expansion.Strategic MethodologyUnlike deterministic models, this engine utilizes a Stochastic Risk-Adjusted Framework to account for market volatility:Growth Velocity (60%): Measures GDP growth smoothed over a 15-year horizon, penalized by a 0.95 maturity decay factor.Inflationary Penalty (20%): Incorporates the standard deviation of CPI to penalize markets with high inflationary volatility.Infrastructure/EODB (20%): Factors in qualitative Ease-of-Doing-Business indices to assess market accessibility.Stochasticity: Implements Gaussian noise ($\sigma=0.005$) to prevent deterministic bias, ensuring projections reflect realistic economic uncertainty.Visualization FrameworkThe dashboard leverages the GE-McKinsey Nine-Box Matrix, classifying markets into three strategic quadrants:Invest/Grow: High-momentum markets with robust infrastructure.Selectivity/Earnings: Markets requiring cautious, targeted capital allocation.Harvest/Divest: Markets where systemic risk outweighs potential growth.Technical ArchitectureData Pipeline: Automated ETL pipeline orchestrated via GitHub Actions (CRON-triggered weekly) to pull, sanitize, and cache raw economic data.Frontend: A high-performance Streamlit dashboard featuring interactive Plotly visualizations.Persistence: A centralized market_engine_cache.csv serving as the single source of truth for the entire application.Repository StructurePlaintext├── .github/workflows/   # CI/CD Pipeline (Automated Data Updates)
-├── app.py               # Streamlit Frontend / Visualization logic
-├── main.py              # Mathematical Engine / Data Processing
-├── market_engine_cache.csv # Centralized truth for frontend
-└── requirements.txt     # Dependency management
-How to Run LocallyClone the repository:git clone https://github.com/[YOUR-USERNAME]/[YOUR-REPO-NAME].git2. Install dependencies:
+# Global Market Entry Simulation Engine
+
+![Market Matrix](matrix.png)
+
+## Executive Summary
+
+This project is a consultant-grade strategic decision-support tool designed to rank global markets for corporate expansion. By automating data ingestion from the World Bank API and applying a custom Risk-Adjusted ROI framework, the engine enables stakeholders to move beyond intuition and rely on quantitative market modeling.
+
+[View Live Dashboard](https://market-entry-simulator.streamlit.app/)
+
+---
+
+## Strategic Methodology
+
+The engine evaluates market attractiveness through the lens of the **GE-McKinsey Nine-Box Matrix**. Key inputs are synthesized into a `RISK_ADJ_SCORE` using a weighted framework:
+
+- **Velocity (60%):** GDP growth rate smoothed over a 15-year horizon, incorporating maturity decay factors to model long-term terminal value.
+- **Inflation Penalty (20%):** Standard deviation of CPI used as a volatility coefficient to deflate nominal ROI.
+- **Market Maturity (20%):** Qualitative infrastructure and Ease of Doing Business (EODB) indexing.
+
+**Stochastic Modeling:** To prevent deterministic bias, the engine injects Gaussian noise (σ = 0.005) into growth projections, simulating real-world macroeconomic uncertainty.
+
+---
+
+## Technical Architecture
+
+The system is designed for low-maintenance, high-availability production:
+
+- **ETL Pipeline:** A fully automated Python-based pipeline hosted on GitHub Actions. It executes weekly to pull fresh data, process metrics, and update the `market_engine_cache.csv`.
+- **Frontend:** A responsive web application built with Streamlit, featuring interactive `Plotly` visualizations for executive-level decisioning.
+- **Data Persistence:** A centralized cache-based architecture ensures the frontend remains lightweight and performs with sub-second latency.
+
+---
+
+## Project Structure
+
+```
+├── .github/workflows/      # CI/CD pipeline for automated data updates
+├── app.py                  # Streamlit dashboard implementation
+├── main.py                 # Core simulation and ETL engine
+├── market_engine_cache.csv # Processed market data
+└── requirements.txt        # Dependency management
+```
+
+---
+
+## Deployment & Usage
+
+The dashboard is deployed on Streamlit Cloud and keeps itself updated via GitHub Actions.
+
+**To run locally:**
+
+1. Clone the repository:
+   ```bash
+   git clone [your-repo-url]
+   ```
+2. Install dependencies:
    ```bash
    pip install -r requirements.txt
-Run the dashboard:Bashstreamlit run app.py
+   ```
+3. Generate data:
+   ```bash
+   python main.py
+   ```
+4. Launch the dashboard:
+   ```bash
+   streamlit run app.py
+   ```
+
+---
+
+## Portfolio Impact
+
+- **Consulting Methodology:** Demonstrates proficiency in applying strategic frameworks (GE-McKinsey) to raw datasets.
+- **Engineering Rigor:** Implements CI/CD for data pipelines, ensuring that the "source of truth" remains current without manual intervention.
+- **Business Focus:** Prioritizes actionable insights ("Target," "Watch," "Avoid") to facilitate faster, data-driven leadership decisions.
