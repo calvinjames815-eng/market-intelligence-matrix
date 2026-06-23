@@ -65,3 +65,12 @@ with col2:
 
 with st.expander("View Raw Metric Data"):
     st.dataframe(df, use_container_width=True)
+
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
