@@ -16,7 +16,7 @@ The output is a ranked dashboard that tells you: **go here, watch this one, avoi
 
 Want to see the full reasoning behind the model — the math, the framework choices, the tradeoffs? I wrote it up here:
 
-[📄 Download Market Entry Simulation Case Study (PDF)](link-to-your-pdf-file)
+[📄 Download Market Entry Simulation Case Study (PDF)](case-study.pdf)
 
 ---
 
