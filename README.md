@@ -2,41 +2,43 @@
 
 ![Market Matrix](matrix.png)
 
-## Executive Summary
+## What This Is
 
-This project is a consultant-grade strategic decision-support tool designed to rank global markets for corporate expansion. By automating data ingestion from the World Bank API and applying a custom Risk-Adjusted ROI framework, the engine enables stakeholders to move beyond intuition and rely on quantitative market modeling.
+Most market entry decisions get made with a mix of gut feel and outdated reports. This tool tries to fix that — it pulls live economic data from the World Bank, runs it through a weighted scoring model, and surfaces which markets are actually worth pursuing.
 
-[View Live Dashboard](https://market-entry-simulator.streamlit.app/)
+The output is a ranked dashboard that tells you: **go here, watch this one, avoid that.**
+
+[🚀 View Live Dashboard](https://market-entry-simulator.streamlit.app/)
 
 ---
 
 ## Project Documentation
 
-To understand the rationale behind the engine's design, mathematical modeling, and strategic framework, please refer to the detailed project case study:
+Want to see the full reasoning behind the model — the math, the framework choices, the tradeoffs? I wrote it up here:
 
 [📄 Download Market Entry Simulation Case Study (PDF)](link-to-your-pdf-file)
 
 ---
 
-## Strategic Methodology
+## How the Scoring Works
 
-The engine evaluates market attractiveness through the lens of the **GE-McKinsey Nine-Box Matrix**. Key inputs are synthesized into a `RISK_ADJ_SCORE` using a weighted framework:
+Each market gets a `RISK_ADJ_SCORE` built from three factors, weighted by how much they actually move the needle:
 
-- **Velocity (60%):** GDP growth rate smoothed over a 15-year horizon, incorporating maturity decay factors to model long-term terminal value.
-- **Inflation Penalty (20%):** Standard deviation of CPI used as a volatility coefficient to deflate nominal ROI.
-- **Market Maturity (20%):** Qualitative infrastructure and Ease of Doing Business (EODB) indexing.
+- **Velocity (60%):** GDP growth averaged over 15 years, with a decay factor so a market that peaked a decade ago doesn't look artificially attractive.
+- **Inflation Penalty (20%):** Uses CPI volatility — not just the headline number — to penalize markets where economic instability would eat into returns.
+- **Market Maturity (20%):** Blends infrastructure quality with Ease of Doing Business scores to capture the practical cost of operating in a market.
 
-**Stochastic Modeling:** To prevent deterministic bias, the engine injects Gaussian noise (σ = 0.005) into growth projections, simulating real-world macroeconomic uncertainty.
+To avoid the model being overconfident, I added a small Gaussian noise term (σ = 0.005) to growth inputs. Real economies aren't deterministic, and the model shouldn't pretend otherwise.
+
+The whole thing maps onto the **GE-McKinsey Nine-Box Matrix** — a framework used by strategy consultants to plot industry attractiveness against competitive position.
 
 ---
 
-## Technical Architecture
+## Under the Hood
 
-The system is designed for low-maintenance, high-availability production:
-
-- **ETL Pipeline:** A fully automated Python-based pipeline hosted on GitHub Actions. It executes weekly to pull fresh data, process metrics, and update the `market_engine_cache.csv`.
-- **Frontend:** A responsive web application built with Streamlit, featuring interactive `Plotly` visualizations for executive-level decisioning.
-- **Data Persistence:** A centralized cache-based architecture ensures the frontend remains lightweight and performs with sub-second latency.
+- **Data pipeline:** Python script running on GitHub Actions, scheduled weekly. It hits the World Bank API, processes the metrics, and overwrites `market_engine_cache.csv` automatically — no manual updates needed.
+- **Dashboard:** Built with Streamlit and Plotly. Kept deliberately simple so decision-makers can use it without a technical background.
+- **Architecture:** The frontend reads from the cached CSV, which keeps load times fast and the app free of direct API dependencies.
 
 ---
 
@@ -44,35 +46,27 @@ The system is designed for low-maintenance, high-availability production:
 
 ```
 ├── .github/workflows/      # CI/CD pipeline for automated data updates
-├── app.py                  # Streamlit dashboard implementation
-├── main.py                 # Core simulation and ETL engine
-├── market_engine_cache.csv # Processed market data
-└── requirements.txt        # Dependency management
+├── app.py                  # Streamlit dashboard
+├── main.py                 # ETL engine and scoring logic
+├── market_engine_cache.csv # Processed market data (auto-updated)
+└── requirements.txt        # Dependencies
 ```
 
 ---
 
-## Deployment & Usage
+## Run It Locally
 
-The dashboard is deployed on Streamlit Cloud and keeps itself updated via GitHub Actions.
-
-**To run locally:**
-
-1. Clone the repository:
-   ```bash
-   git clone [your-repo-url]
-   ```
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Generate data:
-   ```bash
-   python main.py
-   ```
-4. Launch the dashboard:
-   ```bash
-   streamlit run app.py
-   ```
+```bash
+git clone [your-repo-url]
+pip install -r requirements.txt
+python main.py        # builds the cache
+streamlit run app.py  # launches the dashboard
+```
 
 ---
+
+## Why I Built It This Way
+
+- **Framework first:** Anchoring the model to GE-McKinsey means the output maps to something analysts and executives already use — easier to trust and present.
+- **Automated freshness:** A dashboard is only useful if the data isn't stale. The GitHub Actions pipeline solves that without any ongoing maintenance.
+- **Actionable output:** The three-tier classification (Target / Watch / Avoid) was a deliberate choice. Rankings are hard to act on; clear categories aren't.
