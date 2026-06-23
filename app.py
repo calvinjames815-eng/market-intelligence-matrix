@@ -4,49 +4,64 @@ import plotly.express as px
 
 # 1. Page Config
 st.set_page_config(page_title="Market Entry Simulator", layout="wide")
-st.title("Global Market Attractiveness Scorecard")
 
-# 2. Data Loading
-@st.cache_data(ttl=3600) # Refreshes cache every hour
+st.title("📊 Global Market Attractiveness Scorecard")
+st.markdown("Dynamic GE-McKinsey Nine-Box Matrix for real-time market entry analysis.")
+
+# 2. Data Loading with Column Cleaning
+@st.cache_data(ttl=3600)
 def load_data():
-    return pd.read_csv("market_engine_cache.csv")
+    df = pd.read_csv("market_engine_cache.csv")
+    df.columns = df.columns.str.strip() # Remove hidden spaces
+    return df
 
 df = load_data()
 
-# 3. Categorize for the Nine-Box Matrix
-# Assuming 0-0.33 (Low), 0.33-0.66 (Med), 0.66-1.0 (High)
+# 3. Corrected Zone Logic (Matching your CSV columns)
 def get_zone(row):
-    if row['Attractiveness_Score'] > 0.66 and row['Competitive_Strength'] > 0.66:
-        return "Invest / Grow"
-    elif row['Attractiveness_Score'] < 0.33 and row['Competitive_Strength'] < 0.33:
-        return "Harvest / Divest"
+    # Using your actual CSV columns
+    attr = float(row['Infrastructure']) 
+    comp = float(row['RISK_ADJ_SCORE'])
+    
+    if attr >= 0.70 and comp >= 0.20:
+        return "1. Invest / Grow"
+    elif attr <= 0.50 and comp <= 0.12:
+        return "3. Harvest / Divest"
     else:
-        return "Selectivity / Earnings"
+        return "2. Selectivity / Earnings"
 
 df['Zone'] = df.apply(get_zone, axis=1)
 
-# 4. Enhanced Visualization
+# 4. Professional Visualization (Using your actual column names)
 fig = px.scatter(
     df, 
-    x="Competitive_Strength", 
-    y="Attractiveness_Score", 
-    text="Market_Name",
-    color="Zone", # Automatically colors the bubbles by strategy
+    x="RISK_ADJ_SCORE", 
+    y="Infrastructure", 
+    text="country",
+    color="Zone",
     size_max=60,
-    range_x=[0, 1],
-    range_y=[0, 1],
-    title="GE-McKinsey Strategic Positioning"
+    range_x=[0.1, 0.25], # Adjusted range to fit your specific data
+    range_y=[0.4, 1.0],  # Adjusted range to fit your specific data
+    title="GE-McKinsey Strategic Positioning Matrix",
+    template="plotly_white"
 )
 
-# Adding the grid lines for the 3x3 effect
-fig.add_hline(y=0.33, line_dash="dot", line_color="gray")
-fig.add_hline(y=0.66, line_dash="dash", line_color="black")
-fig.add_vline(x=0.33, line_dash="dot", line_color="gray")
-fig.add_vline(x=0.66, line_dash="dash", line_color="black")
+# 3x3 Grid
+for val_x in [0.15, 0.20]:
+    fig.add_vline(x=val_x, line_dash="dash", line_color="gray", opacity=0.5)
+for val_y in [0.60, 0.80]:
+    fig.add_hline(y=val_y, line_dash="dash", line_color="gray", opacity=0.5)
 
-fig.update_traces(textposition='top center')
+fig.update_traces(textposition='top center', marker=dict(size=14))
 st.plotly_chart(fig, use_container_width=True)
 
-# 5. Data Table
+# 5. Consultant Metrics
+col1, col2 = st.columns(2)
+with col1:
+    st.metric("Total Markets Analyzed", len(df))
+with col2:
+    top_market = df.loc[df['Infrastructure'].idxmax()]['country']
+    st.metric("Top Infrastructure Market", top_market)
+
 with st.expander("View Raw Metric Data"):
-    st.dataframe(df)
+    st.dataframe(df, use_container_width=True)
