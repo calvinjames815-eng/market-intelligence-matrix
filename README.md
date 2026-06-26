@@ -2,44 +2,28 @@
 
 ![Market Matrix](matrix.png)
 
-## What This Is
+I built this tool to automate how I evaluate new global markets. Most market entry decisions rely on gut feel or outdated reports, so I created a pipeline that pulls live economic data from the World Bank and runs it through a weighted scoring model based on the GE-McKinsey Nine-Box Matrix.
 
-Most market entry decisions get made with a mix of gut feel and outdated reports. This tool tries to fix that — it pulls live economic data from the World Bank, runs it through a weighted scoring model, and surfaces which markets are actually worth pursuing.
-
-The output is a ranked dashboard that tells you: **go here, watch this one, avoid that.**
-
-[🚀 View Live Dashboard](https://market-entry-simulator.streamlit.app/)
+[View Live Dashboard](https://market-entry-simulator.streamlit.app/)|[Download Market Entry Simulation Case Study (PDF)](case-study.pdf)
 
 ---
 
-## Project Documentation
+## How it works
+Each market is assigned a `RISK_ADJ_SCORE` based on these four factors:
+- **GDP Velocity (40%):** It had 15-year growth trajectory.
+- **Inflation Penalty (10%):** CPI volatility.
+- **Labor Capacity (30%):** Workforce participation metrics.
+- **Infrastructure (20%):** Ease of Doing Business score.
 
-Want to see the full reasoning behind the model — the math, the framework choices, the tradeoffs? I wrote it up here:
-
-[📄 Download Market Entry Simulation Case Study (PDF)](case-study.pdf)
-
+  I added a small Gaussian noise term (σ = 0.005) to the growth inputs. Real economies aren't perfectly predictable, and I didn't want the model's output to have falsely deterministic results.
+ 
 ---
 
-## How the Scoring Works
+## Architecture
 
-Each market gets a `RISK_ADJ_SCORE` built from three factors, weighted by how much they actually move the needle:
-
-- **Velocity (60%):** GDP growth averaged over 15 years, with a decay factor so a market that peaked a decade ago doesn't look artificially attractive.
-- **Inflation Penalty (20%):** Uses CPI volatility — not just the headline number — to penalize markets where economic instability would eat into returns.
-- **Market Maturity (20%):** Blends infrastructure quality with Ease of Doing Business scores to capture the practical cost of operating in a market.
-
-To avoid the model being overconfident, I added a small Gaussian noise term (σ = 0.005) to growth inputs. Real economies aren't deterministic, and the model shouldn't pretend otherwise.
-
-The whole thing maps onto the **GE-McKinsey Nine-Box Matrix** — a framework used by strategy consultants to plot industry attractiveness against competitive position.
-
----
-
-## Under the Hood
-
-- **Data pipeline:** Python script running on GitHub Actions, scheduled weekly. It hits the World Bank API, processes the metrics, and overwrites `market_engine_cache.csv` automatically — no manual updates needed.
-- **Dashboard:** Built with Streamlit and Plotly. Kept deliberately simple so decision-makers can use it without a technical background.
-- **Architecture:** The frontend reads from the cached CSV, which keeps load times fast and the app free of direct API dependencies.
-
+- **ETL pipeline:** A Python script runs weekly via GitHub Actions to query the World Bank API, process the metrics, and update `market_engine_cache.csv`.
+- **Dashboard:** I built the front end in Streamlit and Plotly. It reads directly from the cache to keep load times snappy and avoid dependency on live API calls.
+- **Outputs:** The dashboard categorizes markets into "Target," "Watch," or "Avoid." I chose this over simple rankings because clear categories are easier to act on than a long, ambiguous list.
 ---
 
 ## Project Structure
@@ -59,14 +43,8 @@ The whole thing maps onto the **GE-McKinsey Nine-Box Matrix** — a framework us
 ```bash
 git clone [your-repo-url]
 pip install -r requirements.txt
-python main.py        # builds the cache
-streamlit run app.py  # launches the dashboard
+python main.py        # updates the cache
+streamlit run app.py  # launch the dashboard
 ```
 
 ---
-
-## Why I Built It This Way
-
-- **Framework first:** Anchoring the model to GE-McKinsey means the output maps to something analysts and executives already use — easier to trust and present.
-- **Automated freshness:** A dashboard is only useful if the data isn't stale. The GitHub Actions pipeline solves that without any ongoing maintenance.
-- **Actionable output:** The three-tier classification (Target / Watch / Avoid) was a deliberate choice. Rankings are hard to act on; clear categories aren't.
