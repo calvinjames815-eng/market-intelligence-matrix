@@ -4,7 +4,7 @@
 
 I built this tool to automate how I evaluate new global markets. Most market entry decisions rely on gut feel or outdated reports, so I created a pipeline that pulls live economic data from the World Bank and runs it through a weighted scoring model based on the GE-McKinsey Nine-Box Matrix.
 
-[View Live Dashboard](https://market-entry-simulator.streamlit.app/)|[Download Market Entry Simulation Case Study (PDF)](case-study.pdf)
+[View Live Dashboard](https://market-entry-simulator.streamlit.app/) | [Download Market Entry Simulation Case Study (PDF)](case-study.pdf)
 
 ---
 
