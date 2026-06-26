@@ -2,28 +2,30 @@
 
 ![Market Matrix](matrix.png)
 
-I built this tool to automate how I evaluate new global markets. Most market entry decisions rely on gut feel or outdated reports, so I created a pipeline that pulls live economic data from the World Bank and runs it through a weighted scoring model based on the GE-McKinsey Nine-Box Matrix.
+I decided to built this tool to automate how I evaluate new global market trends. I didn't want to enter the market by rely on Intuition and relying at outdated reports, so I created a pipeline that pulls live economic data from the World Bank and it runs through a weighted scoring model based on the GE-McKinsey Nine-Box Matrix.
 
 [View Live Dashboard](https://market-entry-simulator.streamlit.app/) | [Download Market Entry Simulation Case Study (PDF)](case-study.pdf)
 
 ---
 
 ## How it works
-Each market is assigned a `RISK_ADJ_SCORE` based on these four factors:
-- **GDP Velocity (40%):** It had 15-year growth trajectory.
-- **Inflation Penalty (10%):** CPI volatility.
-- **Labor Capacity (30%):** Workforce participation metrics.
-- **Infrastructure (20%):** Ease of Doing Business score.
+I calculated the `RISK_ADJ_SCORE` for each market it's based on four factors:
 
-  I added a small Gaussian noise term (σ = 0.005) to the growth inputs. Real economies aren't perfectly predictable, and I didn't want the model's output to have falsely deterministic results.
+  - GDP growth (40%)
+  - Labor capacity (30%)
+  - Infrastructure (20%)
+  - Inflation volatility (10%).
+
+  I added a small Gaussian noise term (σ = 0.005) to the growth input. Real economies are messy and unpredictable, and I didn't want the model's decision to be highly optimistic about the results.
  
 ---
 
 ## Architecture
 
-- **ETL pipeline:** A Python script runs weekly via GitHub Actions to query the World Bank API, process the metrics, and update `market_engine_cache.csv`.
-- **Dashboard:** I built the front end in Streamlit and Plotly. It reads directly from the cache to keep load times snappy and avoid dependency on live API calls.
-- **Outputs:** The dashboard categorizes markets into "Target," "Watch," or "Avoid." I chose this over simple rankings because clear categories are easier to act on than a long, ambiguous list.
+- **ETL pipeline:** A Python script runs weekly in GitHub Actions to gather latest data from the World Bank API and update `market_engine_cache.csv` automatically.
+- **Dashboard:** I used Streamlit and Plotly for the UI. It reads directly from the cache to keep loadtime faster and avoid dependency on live API calls.
+- **Result:** The dashboard categorizes the market into "Target," "Watch," or "Avoid." I like this better than a ranked list and it helps me figure out what to do next.
+  
 ---
 
 ## Project Structure
@@ -38,7 +40,7 @@ Each market is assigned a `RISK_ADJ_SCORE` based on these four factors:
 
 ---
 
-## Run It Locally
+## How to set it upLocally
 
 ```bash
 git clone [your-repo-url]
